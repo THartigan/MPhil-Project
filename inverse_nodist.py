@@ -109,6 +109,9 @@ def pc_sampling(net, latents, latents_pos, inverseop, noisy=None, randn_like = t
 def measurement_cond_fn(measurement, x_prev, x0hat, inverseop, pad=24, w=256):
     difference = measurement - inverseop.A(x0hat[:,pad:pad+w, pad:pad+w]).to(dtype=torch.float32)
     norm = torch.linalg.norm(difference)
+    # Using gradient of norm instead of norm^2 is equivalent (within a factor of 2)
+    # of using gradient of norm^2 and then using a "normalized" step size
+    # as recommended in Footnote 5 and Appendix D.1 of the 2023 ICLR paper on DPS.
     norm_grad = torch.autograd.grad(outputs=norm, inputs=x_prev)[0]
     return norm_grad
 
