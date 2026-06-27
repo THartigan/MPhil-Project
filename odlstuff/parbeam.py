@@ -9,7 +9,8 @@ import scipy.io
 class parbeam(object):
     def __init__(self, sigSize, numAngles, numDetector,
                  min_pt=[-20, -20], max_pt=[20, 20],
-                 y_area=[-40, 40], Hf=None, lact=False):
+                 y_area=[-40, 40], Hf=None, lact=False, impl='astra_cuda',
+                 angle_min=0, angle_max=np.pi):
         self.sigSize = sigSize
         self.numAngles = numAngles
         self.numDetector = numDetector
@@ -22,7 +23,7 @@ class parbeam(object):
             self.angle_partition = odl.uniform_partition(0, np.pi*2/3, numAngles)
             print('running this')
         else:
-            self.angle_partition = odl.uniform_partition(0, np.pi, numAngles)
+            self.angle_partition = odl.uniform_partition(angle_min, angle_max, numAngles)
         self.detector_partition = odl.uniform_partition(self.y_area[0], self.y_area[1], self.numDetector)
 
         self.geometry = odl.tomo.Parallel2dGeometry(self.angle_partition, self.detector_partition)
@@ -30,7 +31,7 @@ class parbeam(object):
                                                   #src_radius=133, det_radius=392, axis=axis)
 
         # A operator
-        self.A = odl.tomo.RayTransform(self.reco_space, self.geometry, impl='astra_cuda')
+        self.A = odl.tomo.RayTransform(self.reco_space, self.geometry, impl=impl)
 
     def grad(self, x, y):
         if self.Hf is None: # AT*(Ax - y)

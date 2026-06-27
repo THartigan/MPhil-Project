@@ -9,7 +9,7 @@ import PIL.Image
 import dnnlib
 from training.pos_embedding import Pos_Embedding
 import scipy.io
-from diffusers import AutoencoderKL
+import json
 import random
 from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
@@ -17,10 +17,36 @@ import matplotlib.pyplot as plt
 import sys
 from inverse_operators import *
 from denoise_padding import denoisedFromPatches, getIndices, denoisedOverlap, denoisedTile
+from lion_checkpoint import load_lion_padis_model, read_lion_padis_metadata
 
-def makeFigures(noisy2, denoised2, orig2, i, imsize=256):
+def log(message):
+    print(message, flush=True)
+
+def tensor_stats(prefix, tensor):
+    tensor = tensor.detach()
+    return {
+        f'{prefix}_min': float(tensor.amin().cpu()),
+        f'{prefix}_max': float(tensor.amax().cpu()),
+        f'{prefix}_mean': float(tensor.mean().cpu()),
+        f'{prefix}_std': float(tensor.std().cpu()),
+        f'{prefix}_norm': float(torch.linalg.norm(tensor).cpu()),
+    }
+
+def set_run_seed(seed):
+    if seed is None:
+        return
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+def makeFigures(noisy2, denoised2, orig2, i, imsize=256, preview_dir=None):
+    preview_dir = preview_dir or os.environ.get('PADIS_INTERMEDIATE_DIR')
+    if not preview_dir:
+        return
     channels = len(denoised2[:,0,0])
-    dir = '/n/badwater/z/jashu/Patch-Diffusion/inf_results/'
+    os.makedirs(preview_dir, exist_ok=True)
     denoised = torch.clone(denoised2)
     noisy = torch.clone(noisy2)
     orig = orig2.copy()
@@ -38,6 +64,22 @@ def makeFigures(noisy2, denoised2, orig2, i, imsize=256):
     denoised = np.clip(denoised, 0,1)
     orig = np.clip(orig, 0, 1)
 
+    plt.imsave(
+        os.path.join(preview_dir, f'{i}_recon.png'),
+        denoised,
+        cmap='gray',
+        vmin=0,
+        vmax=1,
+    )
+    plt.imsave(
+        os.path.join(preview_dir, f'{i}_fbp.png'),
+        noisy,
+        cmap='gray',
+        vmin=0,
+        vmax=1,
+    )
+    np.save(os.path.join(preview_dir, f'{i}_recon.npy'), denoised)
+
     noisypsnr = psnr(noisy, orig, data_range=1)
     denoisedpsnr = psnr(denoised, orig, data_range=1)
     t1 = 'FBP recon'
@@ -48,9 +90,36 @@ def makeFigures(noisy2, denoised2, orig2, i, imsize=256):
     plt.subplot(1,3,2),plt.imshow(denoised, cmap='gray'),plt.axis('off'),plt.title(str(denoisedpsnr))
     plt.subplot(1,3,3),plt.imshow(orig, cmap='gray'),plt.axis('off')
 
-    plt.show()
-    plt.savefig(dir + str(i) + '.png')
+    plt.savefig(os.path.join(preview_dir, f'{i}.png'))
     plt.close('all')
+
+def image_array(tensor):
+    array = torch.squeeze(tensor.detach()).cpu().numpy()
+    if array.ndim == 3 and array.shape[0] in (1, 3):
+        array = np.transpose(array, (1, 2, 0))
+    return np.clip(array, 0, 1)
+
+def saveTraceSnapshot(preview_dir, step, inner, pad, w, *, x, denoised, projected, x_next):
+    if not preview_dir:
+        return
+    folder = os.path.join(preview_dir, 'trace_images')
+    os.makedirs(folder, exist_ok=True)
+    stem = f'step_{step:04d}_inner_{inner:02d}_public_dps'
+    cropped = {
+        'current': image_array(x[:, pad:pad+w, pad:pad+w]),
+        'denoised': image_array(denoised[:, pad:pad+w, pad:pad+w]),
+        'projected': image_array(projected[:, pad:pad+w, pad:pad+w]),
+        'x_next': image_array(x_next[:, pad:pad+w, pad:pad+w]),
+    }
+    np.savez_compressed(os.path.join(folder, f'{stem}.npz'), **cropped)
+    for name, array in cropped.items():
+        plt.imsave(
+            os.path.join(folder, f'{stem}_{name}.png'),
+            array,
+            cmap='gray',
+            vmin=0,
+            vmax=1,
+        )
 
 def pinv(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
@@ -70,10 +139,16 @@ def pc_sampling(net, latents, latents_pos, inverseop, noisy=None, randn_like = t
     t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
     t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
 
-    x_init = sigma_max*torch.randn(3, w, w).cuda()
+    x_init = sigma_max * torch.randn_like(x_init)
     x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0)
 
-    for i, (t_cur, t_next) in tqdm.tqdm(enumerate(zip(t_steps[:-1], t_steps[1:]))):
+    for i, (t_cur, t_next) in tqdm.tqdm(
+        enumerate(zip(t_steps[:-1], t_steps[1:])),
+        total=num_steps,
+        desc='PaDIS PC outer steps',
+        dynamic_ncols=True,
+        file=sys.stdout,
+    ):
         if i == num_steps-1:
             break
         indices = getIndices(spaced, patches, pad, psize)
@@ -106,18 +181,35 @@ def pc_sampling(net, latents, latents_pos, inverseop, noisy=None, randn_like = t
             makeFigures(x_init, x[:,pad:pad+w, pad:pad+w].detach(), clean, i)
     return x
 
-def measurement_cond_fn(measurement, x_prev, x0hat, inverseop, pad=24, w=256):
+def measurement_cond_fn(
+    measurement,
+    x_prev,
+    x0hat,
+    inverseop,
+    pad=24,
+    w=256,
+    return_details=False,
+    data_gradient_scale=None,
+):
     difference = measurement - inverseop.A(x0hat[:,pad:pad+w, pad:pad+w]).to(dtype=torch.float32)
     norm = torch.linalg.norm(difference)
     # Using gradient of norm instead of norm^2 is equivalent (within a factor of 2)
     # of using gradient of norm^2 and then using a "normalized" step size
     # as recommended in Footnote 5 and Appendix D.1 of the 2023 ICLR paper on DPS.
-    norm_grad = torch.autograd.grad(outputs=norm, inputs=x_prev)[0]
+    raw_norm_grad = torch.autograd.grad(outputs=norm, inputs=x_prev)[0]
+    if data_gradient_scale is None:
+        data_gradient_scale = getattr(inverseop, 'data_gradient_scale', 1.0)
+    data_gradient_scale = float(data_gradient_scale)
+    norm_grad = raw_norm_grad * data_gradient_scale
+    if return_details:
+        return norm_grad, raw_norm_grad, difference, norm, data_gradient_scale
     return norm_grad
 
 def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
-              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,):
+              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,
+              intermediate_dir=None, intermediate_interval=5, data_gradient_scale=None,
+              trace_file=None, trace_interval=0, stop_after_outer_steps=None,):
     w = len(latents[0,0,0,:])
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
@@ -126,9 +218,34 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
     t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
     t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
 
-    x = sigma_max*torch.randn_like(x_init).cuda()
+    x = sigma_max * torch.randn_like(x_init)
     x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0).requires_grad_()
-    for i, (t_cur, t_next) in tqdm.tqdm(enumerate(zip(t_steps[:-1], t_steps[1:]))):
+    if intermediate_dir and intermediate_interval > 0:
+        makeFigures(
+            x_init,
+            x[:, pad:pad+w, pad:pad+w].detach(),
+            clean,
+            'initial',
+            preview_dir=intermediate_dir,
+        )
+    trace_records = []
+    measurement_norm = torch.linalg.norm(noisy.detach()).clamp_min(1e-12)
+    if data_gradient_scale is None:
+        data_gradient_scale = getattr(inverseop, 'data_gradient_scale', 1.0)
+    data_gradient_scale = float(data_gradient_scale)
+    if stop_after_outer_steps is not None:
+        stop_after_outer_steps = int(stop_after_outer_steps)
+        if stop_after_outer_steps <= 0:
+            raise ValueError('stop_after_outer_steps must be positive or None')
+    for i, (t_cur, t_next) in tqdm.tqdm(
+        enumerate(zip(t_steps[:-1], t_steps[1:])),
+        total=min(num_steps, stop_after_outer_steps) if stop_after_outer_steps is not None else num_steps,
+        desc='PaDIS DPS outer steps',
+        dynamic_ncols=True,
+        file=sys.stdout,
+    ):
+        if stop_after_outer_steps is not None and i >= stop_after_outer_steps:
+            break
         alpha = 0.5*t_cur**2
         for j in range(10):
             indices = getIndices(spaced, patches, pad, psize)
@@ -138,15 +255,88 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
             z = randn_like(x)
 
             x0hat = D
-            norm_grad = measurement_cond_fn(noisy, x, x0hat, inverseop, pad=pad)
-            x = x - zeta * norm_grad
+            should_trace = (
+                trace_interval > 0
+                and (i % trace_interval == 0 or i == num_steps - 1)
+                and (j == 0 or j == 9)
+            )
+            if should_trace:
+                norm_grad, raw_norm_grad, difference, residual_norm, effective_data_gradient_scale = measurement_cond_fn(
+                    noisy,
+                    x,
+                    x0hat,
+                    inverseop,
+                    pad=pad,
+                    return_details=True,
+                    data_gradient_scale=data_gradient_scale,
+                )
+            else:
+                norm_grad = measurement_cond_fn(
+                    noisy,
+                    x,
+                    x0hat,
+                    inverseop,
+                    pad=pad,
+                    data_gradient_scale=data_gradient_scale,
+                )
+                raw_norm_grad = None
+                difference = None
+                residual_norm = None
+                effective_data_gradient_scale = data_gradient_scale
+
+            x_after_data = x - zeta * norm_grad
 
             if i < num_steps - 1:
-                x = x + alpha/2 * score + torch.sqrt(alpha) * z
+                x_next = x_after_data + alpha/2 * score + torch.sqrt(alpha) * z
             else:
-                x = x + alpha/2 * score
-        if i%2 == 0 or i == num_steps-1:
-            makeFigures(x_init, x[:,pad:pad+w, pad:pad+w].detach(), clean, i)
+                x_next = x_after_data + alpha/2 * score
+            if should_trace:
+                saveTraceSnapshot(
+                    intermediate_dir,
+                    i,
+                    j,
+                    pad,
+                    w,
+                    x=x,
+                    denoised=D,
+                    projected=x_after_data,
+                    x_next=x_next,
+                )
+                item = {
+                    'algorithm': 'public_dps',
+                    'step': int(i),
+                    'inner': int(j),
+                    'sigma': float(t_cur.detach().cpu()),
+                    'alpha': float(alpha.detach().cpu()),
+                    'residual_norm': float(residual_norm.detach().cpu()),
+                    'measurement_norm': float(measurement_norm.detach().cpu()),
+                    'relative_residual_norm': float((residual_norm / measurement_norm).detach().cpu()),
+                    'score_norm': float(torch.linalg.norm(score.detach()).cpu()),
+                    'gradient_norm': float(torch.linalg.norm(norm_grad.detach()).cpu()),
+                    'raw_gradient_norm': float(torch.linalg.norm(raw_norm_grad.detach()).cpu()),
+                    'data_gradient_scale': float(effective_data_gradient_scale),
+                    'z_norm': float(torch.linalg.norm(z.detach()).cpu()),
+                }
+                item.update(tensor_stats('x', x))
+                item.update(tensor_stats('denoised', D))
+                item.update(tensor_stats('residual', difference))
+                item.update(tensor_stats('projected', x_after_data))
+                item.update(tensor_stats('x_next', x_next))
+                trace_records.append(item)
+            x = x_next
+        if intermediate_dir and intermediate_interval > 0:
+            if i % intermediate_interval == 0 or i == num_steps-1:
+                makeFigures(
+                    x_init,
+                    x[:,pad:pad+w, pad:pad+w].detach(),
+                    clean,
+                    f'step_{i:04d}',
+                    preview_dir=intermediate_dir,
+                )
+    if trace_file and trace_interval > 0:
+        os.makedirs(os.path.dirname(trace_file) or '.', exist_ok=True)
+        with open(trace_file, 'w') as f:
+            json.dump([{'index': 0, 'trace': trace_records}], f, indent=2)
     return x.detach()
 
 def langevin(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
@@ -167,7 +357,13 @@ def langevin(net, latents, latents_pos, inverseop, noisy=None, randn_like = torc
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
     #print(x.shape)
-    for i, (t_cur, t_next) in tqdm.tqdm(enumerate(zip(t_steps[:-1], t_steps[1:]))):
+    for i, (t_cur, t_next) in tqdm.tqdm(
+        enumerate(zip(t_steps[:-1], t_steps[1:])),
+        total=num_steps,
+        desc='PaDIS Langevin outer steps',
+        dynamic_ncols=True,
+        file=sys.stdout,
+    ):
         alpha = 1*t_cur**2
         for j in range(10):
             indices = getIndices(spaced, patches, pad, psize)
@@ -239,6 +435,33 @@ def set_requires_grad(model, value):
 
 #----------------------------------------------------------------------------
 
+def fill_lion_metadata_defaults(network_pkl, image_size, pad, psize, channels):
+    metadata = {}
+    if network_pkl.endswith('.pt') or network_pkl.endswith('.pth'):
+        metadata = read_lion_padis_metadata(network_pkl)
+
+    image_size = image_size if image_size is not None else metadata.get('image_size')
+    pad = pad if pad is not None else metadata.get('pad')
+    psize = psize if psize is not None else metadata.get('psize')
+    channels = channels if channels is not None else metadata.get('channels', 1)
+
+    missing = []
+    if image_size is None:
+        missing.append('--image_size')
+    if pad is None:
+        missing.append('--pad')
+    if psize is None:
+        missing.append('--psize')
+    if missing:
+        raise click.ClickException(
+            'Missing required reconstruction size option(s): '
+            + ', '.join(missing)
+            + '. Pass them explicitly, or use a LION checkpoint with a .json sidecar.'
+        )
+    return int(image_size), int(pad), int(psize), int(channels), metadata
+
+#----------------------------------------------------------------------------
+
 @click.command()
 #directory based options
 @click.option('--network', 'network_pkl',  help='Network pickle filename', metavar='PATH|URL',                      type=str, required=True)
@@ -247,12 +470,25 @@ def set_requires_grad(model, value):
 @click.option('--image_size',                help='Sample resolution', metavar='INT',                                 type=int, default=None)
 @click.option('--pad',                help='Pad width', metavar='INT',                                 type=int, default=None)
 @click.option('--psize',                help='Patch size', metavar='INT',                                 type=int, default=None)
+@click.option('--device',                help='Torch device', metavar='STR',                                 type=str, default='cuda', show_default=True)
+@click.option('--lion_repo',             help='Local LION repository path for .pt checkpoints', metavar='DIR', type=str, default=None)
+@click.option('--raw_weights',           help='Ignore EMA sidecar/state when loading LION checkpoints', is_flag=True)
+@click.option('--max_images',            help='Maximum number of PNG images to reconstruct', type=int, default=None)
+@click.option('--start_index',           help='Index in sorted PNG list to start from', type=int, default=0, show_default=True)
+@click.option('--seed',                  help='Seed Python, NumPy, and PyTorch RNGs for reproducible patch/noise draws. Omit to keep original unseeded Python-random behavior.', type=int, default=None)
+@click.option('--ct_impl',               help='ODL RayTransform implementation. Defaults to astra_cuda on CUDA and astra_cpu on CPU.', type=click.Choice(['astra_cuda', 'astra_cpu', 'skimage']), default=None)
+@click.option('--intermediate_dir',       help='Directory for intermediate sampler PNGs. Defaults to OUTDIR/intermediates. Use --intermediate_interval 0 to disable.', type=str, default=None)
+@click.option('--intermediate_interval',  help='Save intermediate PNGs every N outer steps. Set 0 to disable.', type=click.IntRange(min=0), default=5, show_default=True)
+@click.option('--trace_file',             help='Optional JSON file for public DPS tensor statistics.', type=str, default=None)
+@click.option('--trace_interval',         help='Write public DPS tensor statistics every N outer steps. Set 0 to disable.', type=click.IntRange(min=0), default=0, show_default=True)
+@click.option('--stop_after_outer_steps', help='Debugging aid: stop after this many outer sampler steps while preserving the full sigma schedule.', type=click.IntRange(min=1), default=None)
+@click.option('--data_gradient_scale',    help='Optional multiplier for the DPS norm-gradient. Defaults to the inverse operator compatibility scale.', type=float, default=None)
 
 #inverse operator options
 @click.option('--views',                help='Number of CT views', metavar='INT',                                type=click.IntRange(min=1), default=20, show_default=True)
 @click.option('--blursize',                help='Size of blur kernel', metavar='INT',                                type=click.IntRange(min=1), default=31, show_default=True)
-@click.option('--channels',                help='Image channels', metavar='INT',                                type=click.IntRange(min=1), default=1, show_default=True)
-@click.option('--name',                  help='Experiment type', metavar='ct_parbeam|ct_fanbeam|denoise',             type=click.Choice(['ct_parbeam', 'ct_fanbeam', 'lact', 'denoise', 'deblur_uniform', 'super']))
+@click.option('--channels',                help='Image channels', metavar='INT',                                type=click.IntRange(min=1), default=None)
+@click.option('--name',                  help='Experiment type', metavar='ct_parbeam|ct_fanbeam|ct_lion_fanbeam|ct_lion_parbeam|denoise',             type=click.Choice(['ct_parbeam', 'ct_fanbeam', 'ct_lion_fanbeam', 'ct_lion_parbeam', 'lact', 'denoise', 'deblur_uniform', 'super']))
 @click.option('--sigma',                help='Noise of measurement', metavar='FLOAT',                          type=click.FloatRange(min=0), default=0, show_default=True)
 @click.option('--scale',                help='Superresolution scale', metavar='INT',                                type=click.IntRange(min=1), default=2, show_default=True)
 
@@ -274,16 +510,79 @@ def set_requires_grad(model, value):
 @click.option('--schedule',                help='Ablate noise schedule sigma(t)', metavar='vp|ve|linear',           type=click.Choice(['vp', 've', 'linear']))
 @click.option('--scaling',                 help='Ablate signal scaling s(t)', metavar='vp|none',                    type=click.Choice(['vp', 'none']))
 
-def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scale,channels, sigma, pad, psize,
-         device=torch.device('cuda'), **sampler_kwargs):
+def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scale, channels, sigma, pad, psize,
+         device, lion_repo, raw_weights, max_images, start_index, seed, ct_impl,
+         intermediate_dir, intermediate_interval, trace_file, trace_interval, stop_after_outer_steps, data_gradient_scale, **sampler_kwargs):
+    device = torch.device(device)
+    if device.type == 'cuda' and not torch.cuda.is_available():
+        raise RuntimeError('CUDA was requested but is not available.')
+    if ct_impl is None:
+        ct_impl = 'astra_cuda' if device.type == 'cuda' else 'astra_cpu'
+    os.makedirs(outdir, exist_ok=True)
+    set_run_seed(seed)
+    if seed is not None:
+        log(f'Using seed={seed}')
+    log(f'Using torch device={device}, ODL CT implementation={ct_impl}')
+    if intermediate_interval > 0:
+        if intermediate_dir is None:
+            intermediate_dir = os.path.join(outdir, 'intermediates')
+        os.makedirs(intermediate_dir, exist_ok=True)
+        log(
+            f'Saving intermediate PNGs every {intermediate_interval} outer steps '
+            f'to "{intermediate_dir}".'
+        )
+    else:
+        intermediate_dir = None
+        log('Intermediate PNG saving disabled.')
+    if trace_interval > 0:
+        if trace_file is None:
+            trace_file = os.path.join(outdir, 'trace.json')
+        log(f'Saving public DPS trace every {trace_interval} outer steps to "{trace_file}".')
+    else:
+        trace_file = None
+
+    image_size, pad, psize, channels, lion_metadata = fill_lion_metadata_defaults(
+        network_pkl, image_size, pad, psize, channels
+    )
+    if lion_metadata:
+        log(
+            'Using LION checkpoint metadata: '
+            f'image_size={image_size}, pad={pad}, psize={psize}, channels={channels}'
+        )
+
     # Load network.
-    print(f'Loading network from "{network_pkl}"...')
-    with dnnlib.util.open_url(network_pkl, verbose=False) as f:
-        net = pickle.load(f)['ema'].to(device)
+    log(f'Loading network from "{network_pkl}"...')
+    if network_pkl.endswith('.pt') or network_pkl.endswith('.pth'):
+        net = load_lion_padis_model(
+            network_pkl,
+            device=device,
+            lion_repo=lion_repo,
+            use_ema=not raw_weights,
+        )
+    else:
+        with dnnlib.util.open_url(network_pkl, verbose=False) as f:
+            net = pickle.load(f)['ema'].to(device)
+    log('Network loaded.')
 
     files = os.listdir(image_dir)
-    png_files = [file for file in files if file.endswith('.png')]
-    inverseop = InverseOperator(image_size, name, views=views, channels=channels, blursize=blursize, scale_factor=scale)
+    png_files = sorted(file for file in files if file.lower().endswith('.png'))
+    if start_index:
+        png_files = png_files[start_index:]
+    if max_images is not None:
+        png_files = png_files[:max_images]
+    if not png_files:
+        raise click.ClickException(f'No PNG files found in {image_dir}')
+    log(f'Found {len(png_files)} PNG image(s) in {image_dir}.')
+    log(f'Building inverse operator for name={name}, views={views}, image_size={image_size}.')
+    inverseop = InverseOperator(image_size, name, views=views, channels=channels, blursize=blursize, scale_factor=scale, ct_impl=ct_impl)
+    log('Inverse operator ready.')
+    effective_data_gradient_scale = (
+        getattr(inverseop, 'data_gradient_scale', 1.0)
+        if data_gradient_scale is None
+        else data_gradient_scale
+    )
+    if effective_data_gradient_scale != 1.0:
+        log(f'Using DPS data gradient scale={effective_data_gradient_scale}.')
 
     x_start = 0
     y_start = 0
@@ -297,35 +596,66 @@ def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scal
 
     allclean = np.zeros((len(png_files), image_size, image_size, channels))
     allrecon = np.zeros((len(png_files), image_size, image_size, channels))
-    print(f'Generating images to "{outdir}"...')
+    log(f'Generating images to "{outdir}"...')
     totpsnr = 0
     totssim = 0
     psnrarr = []
     ssimarr = []
 
-    for loop in tqdm.tqdm(range(len(png_files))):
+    for loop in tqdm.tqdm(
+        range(len(png_files)),
+        total=len(png_files),
+        desc='PaDIS input images',
+        dynamic_ncols=True,
+        file=sys.stdout,
+    ):
         clean = PIL.Image.open(os.path.join(image_dir, png_files[loop]))
         clean = np.asarray(clean)/255
         if channels == 1:
             clean = np.expand_dims(clean, 0)
         elif channels == 3:
             clean = np.transpose(clean, (2,0,1))
-        print(clean.min(), clean.max())
-        print('clean shape: ', clean.shape)
+        log(f'Input range: min={clean.min()} max={clean.max()}')
+        log(f'clean shape: {clean.shape}')
 
-        print(f'Now doing image "{png_files[loop]}"')
+        log(f'Now doing image "{png_files[loop]}"')
 
-        xclean = torch.from_numpy(clean).cuda()
+        xclean = torch.from_numpy(clean).to(device=device, dtype=torch.float32)
+        log('Forward-projecting clean image.')
         noisy_y = inverseop.A(xclean)
-        print('clean: ', xclean.shape)
-        print('noisy: ', noisy_y.shape)
+        log(f'clean tensor shape: {tuple(xclean.shape)}')
+        log(f'noisy measurement shape: {tuple(noisy_y.shape)}')
         noisy_y = noisy_y + sigma*torch.randn_like(noisy_y)
         scipy.io.savemat('proj.mat', {'proj': noisy_y.cpu().numpy()})
 
         latents = torch.randn([1, channels, image_size, image_size], device=device)
 
         sampler_kwargs = {key: value for key, value in sampler_kwargs.items() if value is not None}
-        images = dps(net, latents, latents_pos, inverseop, clean=clean, noisy=noisy_y, pad=pad, psize=psize, **sampler_kwargs)
+        log('Starting DPS sampler.')
+        sample_intermediate_dir = None
+        if intermediate_dir is not None:
+            sample_intermediate_dir = os.path.join(
+                intermediate_dir,
+                os.path.splitext(png_files[loop])[0],
+            )
+        images = dps(
+            net,
+            latents,
+            latents_pos,
+            inverseop,
+            clean=clean,
+            noisy=noisy_y,
+            pad=pad,
+            psize=psize,
+            intermediate_dir=sample_intermediate_dir,
+            intermediate_interval=intermediate_interval,
+            data_gradient_scale=effective_data_gradient_scale,
+            trace_file=trace_file,
+            trace_interval=trace_interval,
+            stop_after_outer_steps=stop_after_outer_steps,
+            **sampler_kwargs,
+        )
+        log('DPS sampler finished.')
 
         images = torch.clamp(images, min=0, max=1)
         images = images[:, pad:pad+image_size, pad:pad+image_size]
@@ -333,9 +663,9 @@ def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scal
         images = images.cpu().numpy()
         cleantmp = np.transpose(clean, (1,2,0))
         thispsnr = psnr(images, cleantmp, data_range=1)
-        print('psnr for this image: ', thispsnr)
+        log(f'psnr for this image: {thispsnr}')
         myssim = ssim(images, cleantmp, channel_axis=2, data_range=1)
-        print('ssim for this image: ', myssim)
+        log(f'ssim for this image: {myssim}')
         totpsnr += thispsnr
         totssim += myssim
         psnrarr.append(thispsnr)
@@ -343,9 +673,20 @@ def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scal
 
         allclean[loop, :,:,:] = cleantmp
         allrecon[loop,:,:,:] = images
+        PIL.Image.fromarray(np.uint8(np.round(np.squeeze(images) * 255.0))).save(
+            os.path.join(outdir, f'{os.path.splitext(png_files[loop])[0]}_recon.png')
+        )
 
-    print('average psnr: ', totpsnr/(len(png_files)))
-    print('average ssim: ', totssim/(len(png_files)))
+    log(f'average psnr: {totpsnr/(len(png_files))}')
+    log(f'average ssim: {totssim/(len(png_files))}')
+    np.savez_compressed(
+        os.path.join(outdir, 'reconstructions.npz'),
+        clean=allclean,
+        recon=allrecon,
+        psnr=np.asarray(psnrarr),
+        ssim=np.asarray(ssimarr),
+        files=np.asarray(png_files),
+    )
 
 
 #----------------------------------------------------------------------------

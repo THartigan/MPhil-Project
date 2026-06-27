@@ -10,12 +10,12 @@ import dnnlib
 from torch_utils import distributed as dist
 from training.pos_embedding import Pos_Embedding
 import scipy.io
-from diffusers import AutoencoderKL
 import random
 from skimage.metrics import peak_signal_noise_ratio as psnr
 import matplotlib.pyplot as plt
 import sys
-sys.path.append('/n/badwater/z/jashu/Patch-Diffusion/odlstuff')
+import pathlib
+sys.path.append(str(pathlib.Path(__file__).resolve().parent / 'odlstuff'))
 from fanbeam import *
 from parbeam import *
 
@@ -143,8 +143,8 @@ def denoisedTile(net, x, t_hat, latents_pos, class_labels, pad=24, psize=56, ove
     assert lastind < N
 
     output = torch.zeros_like(x_hat)
-    x_input = torch.zeros(patches, channels, psize, psize).to(torch.device('cuda'))
-    pos_input = torch.zeros(patches, 2, psize, psize).to(torch.device('cuda'))
+    x_input = torch.zeros(patches, channels, psize, psize, device=x_hat.device)
+    pos_input = torch.zeros(patches, 2, psize, psize, device=x_hat.device)
 
     for i in range(patches):
         z = indices[i]
@@ -178,8 +178,8 @@ def denoisedOverlap(net, x, t_hat, latents_pos, class_labels, pad=24, psize=56, 
     assert lastind < N
 
     output = torch.zeros_like(x_hat)
-    x_input = torch.zeros(patches, channels, psize, psize).to(torch.device('cuda'))
-    pos_input = torch.zeros(patches, 2, psize, psize).to(torch.device('cuda'))
+    x_input = torch.zeros(patches, channels, psize, psize, device=x_hat.device)
+    pos_input = torch.zeros(patches, 2, psize, psize, device=x_hat.device)
 
     for i in range(patches):
         z = indices[i]
@@ -212,8 +212,8 @@ def denoisedFromPatches(net, x, t_hat, latents_pos, class_labels, indices, t_goa
     pad = int((N - np.sqrt(patches)*psize))
 
     output = torch.zeros_like(x_hat)
-    x_input = torch.zeros(patches, channels, psize, psize).to(torch.device('cuda'))
-    pos_input = torch.zeros(patches, 2, psize, psize).to(torch.device('cuda'))
+    x_input = torch.zeros(patches, channels, psize, psize, device=x_hat.device)
+    pos_input = torch.zeros(patches, 2, psize, psize, device=x_hat.device)
 
     for i in range(patches):
         z = indices[i]
