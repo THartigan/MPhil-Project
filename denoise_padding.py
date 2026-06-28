@@ -1,6 +1,7 @@
 import os
 import re
 import click
+import contextlib
 import tqdm
 import pickle
 import numpy as np
@@ -15,6 +16,7 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 import matplotlib.pyplot as plt
 import sys
 import pathlib
+from torch.utils.checkpoint import checkpoint as activation_checkpoint
 sys.path.append(str(pathlib.Path(__file__).resolve().parent / 'odlstuff'))
 from fanbeam import *
 from parbeam import *
@@ -127,31 +129,117 @@ def denoisedFromImage(net, x2, t_hat, psize=64, pad=64, patches=5, imsize=256, w
     out = denoisedFromPatches(net, x, t_hat, latents_pos, label, indices, t_goal=0)
     return out[:,:,pad:imsize+pad, pad:imsize+pad]
 
-#from stitching unet paper
-def denoisedTile(net, x, t_hat, latents_pos, class_labels, pad=24, psize=56, overlap = 8, t_goal = -1):
-    x_hat = torch.clone(x)
+
+def _public_fixed_starts(N, pad, psize, overlap, start, safe_bounds=False):
+    if psize <= 0:
+        raise ValueError('psize must be positive.')
+    if overlap < 0 or overlap >= psize:
+        raise ValueError('overlap must satisfy 0 <= overlap < psize.')
+    if start < 0 or start + psize > N:
+        raise ValueError('Initial patch start is outside the padded image.')
+    inds = [int(start)]
+    skip = psize - overlap
+    public_stop = N - pad - psize
+    last_valid = N - psize
+    while inds[-1] < public_stop:
+        next_start = inds[-1] + skip
+        if safe_bounds and next_start + psize > N:
+            next_start = last_valid
+        if next_start <= inds[-1]:
+            break
+        inds.append(int(next_start))
+    return sorted(set(inds))
+
+
+def _denoise_indexed_patches(
+    net,
+    x_hat,
+    t_hat,
+    latents_pos,
+    class_labels,
+    indices,
+    *,
+    psize,
+    batch_size=None,
+    track_grad=True,
+    use_checkpoint=False,
+):
     channels = len(x_hat[0,:,0,0])
+    patches = len(indices)
+    if batch_size is None or batch_size <= 0:
+        batch_size = patches
+    batch_size = min(int(batch_size), patches)
+    bigout_chunks = []
+
+    for start in range(0, patches, batch_size):
+        end = min(start + batch_size, patches)
+        x_input = torch.zeros(end - start, channels, psize, psize, device=x_hat.device)
+        pos_input = torch.zeros(end - start, 2, psize, psize, device=x_hat.device)
+        for local_i, i in enumerate(range(start, end)):
+            z = indices[i]
+            x_input[local_i,:,:,:] = torch.squeeze(x_hat[0,:,z[0]:z[1], z[2]:z[3]])
+            pos_input[local_i,:,:,:] = torch.squeeze(latents_pos[:,:,z[0]:z[1], z[2]:z[3]])
+        labels = class_labels
+        if class_labels is not None and hasattr(class_labels, 'shape') and class_labels.shape[0] == patches:
+            labels = class_labels[start:end]
+        grad_context = contextlib.nullcontext() if track_grad else torch.no_grad()
+        with grad_context:
+            def denoise_chunk(image, position):
+                return net(image, t_hat, position, labels)
+
+            if use_checkpoint and track_grad:
+                bigout = activation_checkpoint(
+                    denoise_chunk,
+                    x_input,
+                    pos_input,
+                    use_reentrant=False,
+                )
+            else:
+                bigout = denoise_chunk(x_input, pos_input)
+            bigout_chunks.append(bigout.to(torch.float64))
+    return torch.cat(bigout_chunks, dim=0)
+
+
+#from stitching unet paper
+def denoisedTile(
+    net,
+    x,
+    t_hat,
+    latents_pos,
+    class_labels,
+    pad=24,
+    psize=56,
+    overlap = 8,
+    t_goal = -1,
+    batch_size=None,
+    track_grad=True,
+    safe_bounds=False,
+    use_checkpoint=False,
+):
+    x_hat = torch.clone(x)
     N = len(x_hat[0,0,0,:])
-    inds = [4] #this number can be adjusted
-    skip = psize-overlap
-    while inds[-1] < N-pad-psize:
-        inds.append(inds[-1] + skip)
+    inds = _public_fixed_starts(
+        N, pad, psize, overlap, start=4, safe_bounds=safe_bounds
+    )
     patches = len(inds)
     indices = getIndices(inds, patches, pad, psize, freezeindex = True)
     patches = len(indices) #now is the square of the prev variable
     lastind = inds[-1] + psize
-    assert lastind < N
+    assert lastind <= N if safe_bounds else lastind < N
 
     output = torch.zeros_like(x_hat)
-    x_input = torch.zeros(patches, channels, psize, psize, device=x_hat.device)
-    pos_input = torch.zeros(patches, 2, psize, psize, device=x_hat.device)
-
-    for i in range(patches):
-        z = indices[i]
-        #print(z)
-        x_input[i,:,:,:] = torch.squeeze(x_hat[0,:,z[0]:z[1], z[2]:z[3]])
-        pos_input[i,:,:,:] = torch.squeeze(latents_pos[:,:,z[0]:z[1], z[2]:z[3]])
-    bigout = net(x_input, t_hat, pos_input, class_labels).to(torch.float64)
+    bigout = _denoise_indexed_patches(
+        net,
+        x_hat,
+        t_hat,
+        latents_pos,
+        class_labels,
+        indices,
+        psize=psize,
+        batch_size=batch_size,
+        track_grad=track_grad,
+        use_checkpoint=use_checkpoint,
+    )
 
     M = torch.zeros_like(x_hat) #array for counting how many times each patch is counted
     for i in range(patches):
@@ -163,29 +251,45 @@ def denoisedTile(net, x, t_hat, latents_pos, class_labels, pad=24, psize=56, ove
     return temp
 
 #from weather denoising paper
-def denoisedOverlap(net, x, t_hat, latents_pos, class_labels, pad=24, psize=56, overlap = 8, t_goal = -1):
+def denoisedOverlap(
+    net,
+    x,
+    t_hat,
+    latents_pos,
+    class_labels,
+    pad=24,
+    psize=56,
+    overlap = 8,
+    t_goal = -1,
+    batch_size=None,
+    track_grad=True,
+    safe_bounds=False,
+    use_checkpoint=False,
+):
     x_hat = torch.clone(x)
-    channels = len(x_hat[0,:,0,0])
     N = len(x_hat[0,0,0,:])
-    inds = [pad]
-    skip = psize-overlap
-    while inds[-1] < N-pad-psize:
-        inds.append(inds[-1] + skip)
+    inds = _public_fixed_starts(
+        N, pad, psize, overlap, start=pad, safe_bounds=safe_bounds
+    )
     patches = len(inds)
     indices = getIndices(inds, patches, pad, psize, freezeindex = True)
     patches = len(indices) #now is the square of the prev variable
     lastind = inds[-1] + psize
-    assert lastind < N
+    assert lastind <= N if safe_bounds else lastind < N
 
     output = torch.zeros_like(x_hat)
-    x_input = torch.zeros(patches, channels, psize, psize, device=x_hat.device)
-    pos_input = torch.zeros(patches, 2, psize, psize, device=x_hat.device)
-
-    for i in range(patches):
-        z = indices[i]
-        x_input[i,:,:,:] = torch.squeeze(x_hat[0,:,z[0]:z[1], z[2]:z[3]])
-        pos_input[i,:,:,:] = torch.squeeze(latents_pos[:,:,z[0]:z[1], z[2]:z[3]])
-    bigout = net(x_input, t_hat, pos_input, class_labels).to(torch.float64)
+    bigout = _denoise_indexed_patches(
+        net,
+        x_hat,
+        t_hat,
+        latents_pos,
+        class_labels,
+        indices,
+        psize=psize,
+        batch_size=batch_size,
+        track_grad=track_grad,
+        use_checkpoint=use_checkpoint,
+    )
 
     M = torch.zeros_like(x_hat) #array for counting how many times each patch is counted
     for i in range(patches):
@@ -198,7 +302,7 @@ def denoisedOverlap(net, x, t_hat, latents_pos, class_labels, pad=24, psize=56, 
     temp[:,:,pad:N-pad, pad:N-pad] = output[:,:,pad:N-pad, pad:N-pad]
     return temp
 
-def denoisedFromPatches(net, x, t_hat, latents_pos, class_labels, indices, t_goal = -1, avg=1, spaced=[], wrong=False):
+def denoisedFromPatches(net, x, t_hat, latents_pos, class_labels, indices, t_goal = -1, avg=1, spaced=[], wrong=False, batch_size=None, track_grad=True):
     if len(spaced) > 1:
         indices = getIndices(spaced, 5, 24, 56)
     if wrong:
@@ -212,14 +316,23 @@ def denoisedFromPatches(net, x, t_hat, latents_pos, class_labels, indices, t_goa
     pad = int((N - np.sqrt(patches)*psize))
 
     output = torch.zeros_like(x_hat)
-    x_input = torch.zeros(patches, channels, psize, psize, device=x_hat.device)
-    pos_input = torch.zeros(patches, 2, psize, psize, device=x_hat.device)
+    if batch_size is None or batch_size <= 0:
+        batch_size = patches
+    batch_size = min(int(batch_size), patches)
+    bigout_chunks = []
 
-    for i in range(patches):
-        z = indices[i]
-        x_input[i,:,:,:] = torch.squeeze(x_hat[0,:,z[0]:z[1], z[2]:z[3]])
-        pos_input[i,:,:,:] = torch.squeeze(latents_pos[:,:,z[0]:z[1], z[2]:z[3]])
-    bigout = net(x_input, t_hat, pos_input, class_labels).to(torch.float64)
+    for start in range(0, patches, batch_size):
+        end = min(start + batch_size, patches)
+        x_input = torch.zeros(end - start, channels, psize, psize, device=x_hat.device)
+        pos_input = torch.zeros(end - start, 2, psize, psize, device=x_hat.device)
+        for local_i, i in enumerate(range(start, end)):
+            z = indices[i]
+            x_input[local_i,:,:,:] = torch.squeeze(x_hat[0,:,z[0]:z[1], z[2]:z[3]])
+            pos_input[local_i,:,:,:] = torch.squeeze(latents_pos[:,:,z[0]:z[1], z[2]:z[3]])
+        grad_context = contextlib.nullcontext() if track_grad else torch.no_grad()
+        with grad_context:
+            bigout_chunks.append(net(x_input, t_hat, pos_input, class_labels).to(torch.float64))
+    bigout = torch.cat(bigout_chunks, dim=0)
 
     for i in range(patches):
         z = indices[i]

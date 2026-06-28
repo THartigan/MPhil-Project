@@ -99,12 +99,24 @@ def image_array(tensor):
         array = np.transpose(array, (1, 2, 0))
     return np.clip(array, 0, 1)
 
-def saveTraceSnapshot(preview_dir, step, inner, pad, w, *, x, denoised, projected, x_next):
+def saveTraceSnapshot(
+    preview_dir,
+    step,
+    inner,
+    pad,
+    w,
+    *,
+    x,
+    denoised,
+    projected,
+    x_next,
+    algorithm='public_dps',
+):
     if not preview_dir:
         return
     folder = os.path.join(preview_dir, 'trace_images')
     os.makedirs(folder, exist_ok=True)
-    stem = f'step_{step:04d}_inner_{inner:02d}_public_dps'
+    stem = f'step_{step:04d}_inner_{inner:02d}_{algorithm}'
     cropped = {
         'current': image_array(x[:, pad:pad+w, pad:pad+w]),
         'denoised': image_array(denoised[:, pad:pad+w, pad:pad+w]),
@@ -128,9 +140,19 @@ def pinv(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ra
     fbp = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
     return torch.nn.functional.pad(fbp, (pad, pad, pad, pad), "constant", 0)
 
+def validate_stop_after_outer_steps(stop_after_outer_steps):
+    if stop_after_outer_steps is None:
+        return None
+    stop_after_outer_steps = int(stop_after_outer_steps)
+    if stop_after_outer_steps <= 0:
+        raise ValueError('stop_after_outer_steps must be positive or None')
+    return stop_after_outer_steps
+
 def pc_sampling(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
-              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,):
+              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,
+              intermediate_dir=None, intermediate_interval=5, stop_after_outer_steps=None,
+              patch_batch_size=None, trace_file=None, trace_interval=0,):
     w = len(latents[0,0,0,:])
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
@@ -141,44 +163,114 @@ def pc_sampling(net, latents, latents_pos, inverseop, noisy=None, randn_like = t
 
     x_init = sigma_max * torch.randn_like(x_init)
     x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0)
+    stop_after_outer_steps = validate_stop_after_outer_steps(stop_after_outer_steps)
+    trace_records = []
+    measurement_norm = torch.linalg.norm(noisy.detach()).clamp_min(1e-12)
 
     for i, (t_cur, t_next) in tqdm.tqdm(
         enumerate(zip(t_steps[:-1], t_steps[1:])),
-        total=num_steps,
+        total=min(num_steps, stop_after_outer_steps) if stop_after_outer_steps is not None else num_steps,
         desc='PaDIS PC outer steps',
         dynamic_ncols=True,
         file=sys.stdout,
     ):
+        if stop_after_outer_steps is not None and i >= stop_after_outer_steps:
+            break
         if i == num_steps-1:
             break
         indices = getIndices(spaced, patches, pad, psize)
-        D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False)
+        D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False, batch_size=patch_batch_size, track_grad=False)
         D = torch.squeeze(D, dim=0)
         score = (D-x)/t_cur**2
         x = x + (t_cur**2 - t_next**2) * score
         z = randn_like(x)
         x = x + torch.sqrt(t_cur**2 - t_next**2) * z #predictor step
+        x_predictor = x.clone()
 
         Ainput = noisy-inverseop.A(x[:,pad:pad+w, pad:pad+w].to(dtype=torch.float32))
         stepsize = zeta/torch.norm(Ainput)
-        x[:,pad:pad+w, pad:pad+w] += stepsize * inverseop.AT(Ainput)
+        raw_correction = inverseop.AT(Ainput)
+        correction = stepsize * raw_correction
+        x[:,pad:pad+w, pad:pad+w] += correction
+        should_trace = (
+            trace_interval > 0
+            and (i % trace_interval == 0 or i == num_steps - 1)
+        )
+        if should_trace:
+            item = {
+                'algorithm': 'public_pc_predictor',
+                'step': int(i),
+                'inner': 0,
+                'sigma': float(t_cur.detach().cpu()),
+                'next_sigma': float(t_next.detach().cpu()),
+                'predictor_delta': float((t_cur**2 - t_next**2).detach().cpu()),
+                'data_step_size': float(stepsize.detach().cpu()),
+                'residual_norm': float(torch.linalg.norm(Ainput.detach()).cpu()),
+                'measurement_norm': float(measurement_norm.detach().cpu()),
+                'relative_residual_norm': float((torch.linalg.norm(Ainput.detach()) / measurement_norm).cpu()),
+                'score_norm': float(torch.linalg.norm(score.detach()).cpu()),
+                'z_norm': float(torch.linalg.norm(z.detach()).cpu()),
+                'raw_gradient_norm': float(torch.linalg.norm(raw_correction.detach()).cpu()),
+                'gradient_norm': float(torch.linalg.norm(correction.detach()).cpu()),
+            }
+            item.update(tensor_stats('x_before_data', x_predictor))
+            item.update(tensor_stats('x', x))
+            item.update(tensor_stats('denoised', D))
+            item.update(tensor_stats('residual', Ainput))
+            trace_records.append(item)
 
         if i < num_steps-1:
             z = randn_like(x)
-            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False)
+            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False, batch_size=patch_batch_size, track_grad=False)
             D = torch.squeeze(D, dim=0)
             score = (D-x)/t_next**2
             r = 0.16
             eps = 2*r*torch.norm(z)/torch.norm(score)
             x = x + eps * score
             x = x + torch.sqrt(2*eps)*z #corrector step
+            x_corrector = x.clone()
 
             Ainput = noisy-inverseop.A(x[:,pad:pad+w, pad:pad+w].to(dtype=torch.float32))
             stepsize = zeta/torch.norm(Ainput)* min(40, t_cur*200)
-            x[:,pad:pad+w, pad:pad+w] += stepsize * inverseop.AT(Ainput)
+            raw_correction = inverseop.AT(Ainput)
+            correction = stepsize * raw_correction
+            x[:,pad:pad+w, pad:pad+w] += correction
+            if should_trace:
+                item = {
+                    'algorithm': 'public_pc_corrector',
+                    'step': int(i),
+                    'inner': 1,
+                    'sigma': float(t_cur.detach().cpu()),
+                    'next_sigma': float(t_next.detach().cpu()),
+                    'eps': float(eps.detach().cpu()),
+                    'data_step_size': float(stepsize.detach().cpu()),
+                    'residual_norm': float(torch.linalg.norm(Ainput.detach()).cpu()),
+                    'measurement_norm': float(measurement_norm.detach().cpu()),
+                    'relative_residual_norm': float((torch.linalg.norm(Ainput.detach()) / measurement_norm).cpu()),
+                    'score_norm': float(torch.linalg.norm(score.detach()).cpu()),
+                    'z_norm': float(torch.linalg.norm(z.detach()).cpu()),
+                    'raw_gradient_norm': float(torch.linalg.norm(raw_correction.detach()).cpu()),
+                    'gradient_norm': float(torch.linalg.norm(correction.detach()).cpu()),
+                }
+                item.update(tensor_stats('x_before_data', x_corrector))
+                item.update(tensor_stats('x', x))
+                item.update(tensor_stats('denoised', D))
+                item.update(tensor_stats('residual', Ainput))
+                trace_records.append(item)
 
-        if i%5 == 0 or i == num_steps-1:
-            makeFigures(x_init, x[:,pad:pad+w, pad:pad+w].detach(), clean, i)
+        if intermediate_dir and intermediate_interval > 0:
+            if i % intermediate_interval == 0 or i == num_steps-1:
+                makeFigures(
+                    x_init,
+                    x[:,pad:pad+w, pad:pad+w].detach(),
+                    clean,
+                    i,
+                    preview_dir=intermediate_dir,
+                )
+    if trace_file and trace_interval > 0:
+        os.makedirs(os.path.dirname(trace_file) or '.', exist_ok=True)
+        with open(trace_file, 'w') as f:
+            json.dump([{'index': 0, 'trace': trace_records}], f, indent=2)
     return x
 
 def measurement_cond_fn(
@@ -209,7 +301,8 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
               S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,
               intermediate_dir=None, intermediate_interval=5, data_gradient_scale=None,
-              trace_file=None, trace_interval=0, stop_after_outer_steps=None,):
+              trace_file=None, trace_interval=0, stop_after_outer_steps=None,
+              patch_batch_size=None,):
     w = len(latents[0,0,0,:])
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
@@ -233,10 +326,7 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
     if data_gradient_scale is None:
         data_gradient_scale = getattr(inverseop, 'data_gradient_scale', 1.0)
     data_gradient_scale = float(data_gradient_scale)
-    if stop_after_outer_steps is not None:
-        stop_after_outer_steps = int(stop_after_outer_steps)
-        if stop_after_outer_steps <= 0:
-            raise ValueError('stop_after_outer_steps must be positive or None')
+    stop_after_outer_steps = validate_stop_after_outer_steps(stop_after_outer_steps)
     for i, (t_cur, t_next) in tqdm.tqdm(
         enumerate(zip(t_steps[:-1], t_steps[1:])),
         total=min(num_steps, stop_after_outer_steps) if stop_after_outer_steps is not None else num_steps,
@@ -249,7 +339,7 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
         alpha = 0.5*t_cur**2
         for j in range(10):
             indices = getIndices(spaced, patches, pad, psize)
-            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False)
+            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False, batch_size=patch_batch_size, track_grad=True)
             D = torch.squeeze(D, dim=0)
             score = (D-x)/t_cur**2
             z = randn_like(x)
@@ -339,9 +429,168 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
             json.dump([{'index': 0, 'trace': trace_records}], f, indent=2)
     return x.detach()
 
+
+def fixed_patch_dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
+              clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
+              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,
+              intermediate_dir=None, intermediate_interval=5, data_gradient_scale=None,
+              trace_file=None, trace_interval=0, stop_after_outer_steps=None,
+              patch_batch_size=None, sampler='patch_average', overlap=8,
+              checkpoint_denoiser=False):
+    del S_churn, S_min, S_max, S_noise
+    if sampler == 'patch_average':
+        denoise_fn = denoisedOverlap
+        algorithm_name = 'public_patch_average'
+    elif sampler == 'patch_stitch':
+        denoise_fn = denoisedTile
+        algorithm_name = 'public_patch_stitch'
+    else:
+        raise ValueError(f'Unknown fixed patch sampler: {sampler}')
+
+    w = len(latents[0,0,0,:])
+    x_init = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
+    step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
+    t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
+    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+
+    x = sigma_max * torch.randn_like(x_init)
+    x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0).requires_grad_()
+    if intermediate_dir and intermediate_interval > 0:
+        makeFigures(
+            x_init,
+            x[:, pad:pad+w, pad:pad+w].detach(),
+            clean,
+            'initial',
+            preview_dir=intermediate_dir,
+        )
+    trace_records = []
+    measurement_norm = torch.linalg.norm(noisy.detach()).clamp_min(1e-12)
+    if data_gradient_scale is None:
+        data_gradient_scale = getattr(inverseop, 'data_gradient_scale', 1.0)
+    data_gradient_scale = float(data_gradient_scale)
+    stop_after_outer_steps = validate_stop_after_outer_steps(stop_after_outer_steps)
+    for i, (t_cur, t_next) in tqdm.tqdm(
+        enumerate(zip(t_steps[:-1], t_steps[1:])),
+        total=min(num_steps, stop_after_outer_steps) if stop_after_outer_steps is not None else num_steps,
+        desc=f'PaDIS {sampler} outer steps',
+        dynamic_ncols=True,
+        file=sys.stdout,
+    ):
+        if stop_after_outer_steps is not None and i >= stop_after_outer_steps:
+            break
+        alpha = 0.5*t_cur**2
+        for j in range(10):
+            D = denoise_fn(
+                net,
+                torch.unsqueeze(x, 0),
+                t_cur,
+                latents_pos,
+                None,
+                pad=pad,
+                psize=psize,
+                overlap=overlap,
+                t_goal=0,
+                batch_size=patch_batch_size,
+                track_grad=True,
+                safe_bounds=True,
+                use_checkpoint=checkpoint_denoiser,
+            )
+            D = torch.squeeze(D, dim=0)
+            score = (D-x)/t_cur**2
+            z = randn_like(x)
+
+            x0hat = D
+            should_trace = (
+                trace_interval > 0
+                and (i % trace_interval == 0 or i == num_steps - 1)
+                and (j == 0 or j == 9)
+            )
+            if should_trace:
+                norm_grad, raw_norm_grad, difference, residual_norm, effective_data_gradient_scale = measurement_cond_fn(
+                    noisy,
+                    x,
+                    x0hat,
+                    inverseop,
+                    pad=pad,
+                    return_details=True,
+                    data_gradient_scale=data_gradient_scale,
+                )
+            else:
+                norm_grad = measurement_cond_fn(
+                    noisy,
+                    x,
+                    x0hat,
+                    inverseop,
+                    pad=pad,
+                    data_gradient_scale=data_gradient_scale,
+                )
+                raw_norm_grad = None
+                difference = None
+                residual_norm = None
+                effective_data_gradient_scale = data_gradient_scale
+
+            x_after_data = x - zeta * norm_grad
+
+            if i < num_steps - 1:
+                x_next = x_after_data + alpha/2 * score + torch.sqrt(alpha) * z
+            else:
+                x_next = x_after_data + alpha/2 * score
+            if should_trace:
+                saveTraceSnapshot(
+                    intermediate_dir,
+                    i,
+                    j,
+                    pad,
+                    w,
+                    x=x,
+                    denoised=D,
+                    projected=x_after_data,
+                    x_next=x_next,
+                    algorithm=algorithm_name,
+                )
+                item = {
+                    'algorithm': algorithm_name,
+                    'step': int(i),
+                    'inner': int(j),
+                    'sigma': float(t_cur.detach().cpu()),
+                    'alpha': float(alpha.detach().cpu()),
+                    'residual_norm': float(residual_norm.detach().cpu()),
+                    'measurement_norm': float(measurement_norm.detach().cpu()),
+                    'relative_residual_norm': float((residual_norm / measurement_norm).detach().cpu()),
+                    'score_norm': float(torch.linalg.norm(score.detach()).cpu()),
+                    'gradient_norm': float(torch.linalg.norm(norm_grad.detach()).cpu()),
+                    'raw_gradient_norm': float(torch.linalg.norm(raw_norm_grad.detach()).cpu()),
+                    'data_gradient_scale': float(effective_data_gradient_scale),
+                    'z_norm': float(torch.linalg.norm(z.detach()).cpu()),
+                    'patch_overlap': int(overlap),
+                }
+                item.update(tensor_stats('x', x))
+                item.update(tensor_stats('denoised', D))
+                item.update(tensor_stats('residual', difference))
+                item.update(tensor_stats('projected', x_after_data))
+                item.update(tensor_stats('x_next', x_next))
+                trace_records.append(item)
+            x = x_next
+        if intermediate_dir and intermediate_interval > 0:
+            if i % intermediate_interval == 0 or i == num_steps-1:
+                makeFigures(
+                    x_init,
+                    x[:,pad:pad+w, pad:pad+w].detach(),
+                    clean,
+                    f'step_{i:04d}',
+                    preview_dir=intermediate_dir,
+                )
+    if trace_file and trace_interval > 0:
+        os.makedirs(os.path.dirname(trace_file) or '.', exist_ok=True)
+        with open(trace_file, 'w') as f:
+            json.dump([{'index': 0, 'trace': trace_records}], f, indent=2)
+    return x.detach()
+
 def langevin(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
-              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1, ddnm=False):
+              S_churn=0, S_min=0, S_max=float('inf'), S_noise=1, ddnm=False,
+              intermediate_dir=None, intermediate_interval=5, stop_after_outer_steps=None,
+              patch_batch_size=None):
     w = len(latents[0,0,0,:])
     x_init = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
 
@@ -356,18 +605,21 @@ def langevin(net, latents, latents_pos, inverseop, noisy=None, randn_like = torc
 
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
+    stop_after_outer_steps = validate_stop_after_outer_steps(stop_after_outer_steps)
     #print(x.shape)
     for i, (t_cur, t_next) in tqdm.tqdm(
         enumerate(zip(t_steps[:-1], t_steps[1:])),
-        total=num_steps,
+        total=min(num_steps, stop_after_outer_steps) if stop_after_outer_steps is not None else num_steps,
         desc='PaDIS Langevin outer steps',
         dynamic_ncols=True,
         file=sys.stdout,
     ):
+        if stop_after_outer_steps is not None and i >= stop_after_outer_steps:
+            break
         alpha = 1*t_cur**2
         for j in range(10):
             indices = getIndices(spaced, patches, pad, psize)
-            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False)
+            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False, batch_size=patch_batch_size, track_grad=False)
             D = torch.squeeze(D, dim=0)
             z = randn_like(x)
 
@@ -386,8 +638,15 @@ def langevin(net, latents, latents_pos, inverseop, noisy=None, randn_like = torc
                 x = x + alpha/2 * score + torch.sqrt(alpha) * z
             else:
                 x = x + alpha/2 * score
-        if i%2 == 0 or i == num_steps-1:
-            makeFigures(x_init, x[:,pad:pad+w, pad:pad+w], clean, i)
+        if intermediate_dir and intermediate_interval > 0:
+            if i % intermediate_interval == 0 or i == num_steps-1:
+                makeFigures(
+                    x_init,
+                    x[:,pad:pad+w, pad:pad+w],
+                    clean,
+                    i,
+                    preview_dir=intermediate_dir,
+                )
     return x
 
 
@@ -479,10 +738,13 @@ def fill_lion_metadata_defaults(network_pkl, image_size, pad, psize, channels):
 @click.option('--ct_impl',               help='ODL RayTransform implementation. Defaults to astra_cuda on CUDA and astra_cpu on CPU.', type=click.Choice(['astra_cuda', 'astra_cpu', 'skimage']), default=None)
 @click.option('--intermediate_dir',       help='Directory for intermediate sampler PNGs. Defaults to OUTDIR/intermediates. Use --intermediate_interval 0 to disable.', type=str, default=None)
 @click.option('--intermediate_interval',  help='Save intermediate PNGs every N outer steps. Set 0 to disable.', type=click.IntRange(min=0), default=5, show_default=True)
-@click.option('--trace_file',             help='Optional JSON file for public DPS tensor statistics.', type=str, default=None)
-@click.option('--trace_interval',         help='Write public DPS tensor statistics every N outer steps. Set 0 to disable.', type=click.IntRange(min=0), default=0, show_default=True)
+@click.option('--trace_file',             help='Optional JSON file for public sampler tensor statistics.', type=str, default=None)
+@click.option('--trace_interval',         help='Write public sampler tensor statistics every N outer steps. Set 0 to disable.', type=click.IntRange(min=0), default=0, show_default=True)
 @click.option('--stop_after_outer_steps', help='Debugging aid: stop after this many outer sampler steps while preserving the full sigma schedule.', type=click.IntRange(min=1), default=None)
 @click.option('--data_gradient_scale',    help='Optional multiplier for the DPS norm-gradient. Defaults to the inverse operator compatibility scale.', type=float, default=None)
+@click.option('--patch_batch_size',       help='Optional patch denoiser microbatch size for public helper samplers.', type=click.IntRange(min=1), default=None)
+@click.option('--patch_overlap',          help='Overlap in pixels for patch_average/patch_stitch helper samplers.', type=click.IntRange(min=0), default=8, show_default=True)
+@click.option('--checkpoint_denoiser',    help='Use activation checkpointing for patch_average/patch_stitch denoiser microbatches.', is_flag=True)
 
 #inverse operator options
 @click.option('--views',                help='Number of CT views', metavar='INT',                                type=click.IntRange(min=1), default=20, show_default=True)
@@ -504,6 +766,7 @@ def fill_lion_metadata_defaults(network_pkl, image_size, pad, psize, channels):
 @click.option('--S_max', 'S_max',          help='Stoch. max noise level', metavar='FLOAT',                          type=click.FloatRange(min=0), default='inf', show_default=True)
 @click.option('--S_noise', 'S_noise',      help='Stoch. noise inflation', metavar='FLOAT',                          type=float, default=1, show_default=True)
 @click.option('--zeta',                help='Step size', metavar='FLOAT',                          type=click.FloatRange(min=0), default=1.0, show_default=True)
+@click.option('--sampler',             help='Public helper sampler to execute.', type=click.Choice(['dps', 'pc', 'langevin', 'ddnm', 'patch_average', 'patch_stitch']), default='dps', show_default=True)
 
 @click.option('--solver',                  help='Ablate ODE solver', metavar='euler|heun',                          type=click.Choice(['euler', 'heun']))
 @click.option('--disc', 'discretization',  help='Ablate time step discretization {t_i}', metavar='vp|ve|iddpm|edm', type=click.Choice(['vp', 've', 'iddpm', 'edm']))
@@ -512,7 +775,7 @@ def fill_lion_metadata_defaults(network_pkl, image_size, pad, psize, channels):
 
 def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scale, channels, sigma, pad, psize,
          device, lion_repo, raw_weights, max_images, start_index, seed, ct_impl,
-         intermediate_dir, intermediate_interval, trace_file, trace_interval, stop_after_outer_steps, data_gradient_scale, **sampler_kwargs):
+         intermediate_dir, intermediate_interval, trace_file, trace_interval, stop_after_outer_steps, data_gradient_scale, patch_batch_size, patch_overlap, checkpoint_denoiser, sampler, **sampler_kwargs):
     device = torch.device(device)
     if device.type == 'cuda' and not torch.cuda.is_available():
         raise RuntimeError('CUDA was requested but is not available.')
@@ -537,7 +800,7 @@ def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scal
     if trace_interval > 0:
         if trace_file is None:
             trace_file = os.path.join(outdir, 'trace.json')
-        log(f'Saving public DPS trace every {trace_interval} outer steps to "{trace_file}".')
+        log(f'Saving public sampler trace every {trace_interval} outer steps to "{trace_file}".')
     else:
         trace_file = None
 
@@ -631,31 +894,92 @@ def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scal
         latents = torch.randn([1, channels, image_size, image_size], device=device)
 
         sampler_kwargs = {key: value for key, value in sampler_kwargs.items() if value is not None}
-        log('Starting DPS sampler.')
+        log(f'Starting {sampler} sampler.')
         sample_intermediate_dir = None
         if intermediate_dir is not None:
             sample_intermediate_dir = os.path.join(
                 intermediate_dir,
                 os.path.splitext(png_files[loop])[0],
             )
-        images = dps(
-            net,
-            latents,
-            latents_pos,
-            inverseop,
-            clean=clean,
-            noisy=noisy_y,
-            pad=pad,
-            psize=psize,
-            intermediate_dir=sample_intermediate_dir,
-            intermediate_interval=intermediate_interval,
-            data_gradient_scale=effective_data_gradient_scale,
-            trace_file=trace_file,
-            trace_interval=trace_interval,
-            stop_after_outer_steps=stop_after_outer_steps,
-            **sampler_kwargs,
-        )
-        log('DPS sampler finished.')
+        if sampler == 'dps':
+            images = dps(
+                net,
+                latents,
+                latents_pos,
+                inverseop,
+                clean=clean,
+                noisy=noisy_y,
+                pad=pad,
+                psize=psize,
+                intermediate_dir=sample_intermediate_dir,
+                intermediate_interval=intermediate_interval,
+                data_gradient_scale=effective_data_gradient_scale,
+                trace_file=trace_file,
+                trace_interval=trace_interval,
+                stop_after_outer_steps=stop_after_outer_steps,
+                patch_batch_size=patch_batch_size,
+                **sampler_kwargs,
+            )
+        elif sampler == 'pc':
+            images = pc_sampling(
+                net,
+                latents,
+                latents_pos,
+                inverseop,
+                clean=clean,
+                noisy=noisy_y,
+                pad=pad,
+                psize=psize,
+                intermediate_dir=sample_intermediate_dir,
+                intermediate_interval=intermediate_interval,
+                stop_after_outer_steps=stop_after_outer_steps,
+                patch_batch_size=patch_batch_size,
+                trace_file=trace_file,
+                trace_interval=trace_interval,
+                **sampler_kwargs,
+            )
+        elif sampler in ('langevin', 'ddnm'):
+            images = langevin(
+                net,
+                latents,
+                latents_pos,
+                inverseop,
+                clean=clean,
+                noisy=noisy_y,
+                pad=pad,
+                psize=psize,
+                ddnm=(sampler == 'ddnm'),
+                intermediate_dir=sample_intermediate_dir,
+                intermediate_interval=intermediate_interval,
+                stop_after_outer_steps=stop_after_outer_steps,
+                patch_batch_size=patch_batch_size,
+                **sampler_kwargs,
+            )
+        elif sampler in ('patch_average', 'patch_stitch'):
+            images = fixed_patch_dps(
+                net,
+                latents,
+                latents_pos,
+                inverseop,
+                clean=clean,
+                noisy=noisy_y,
+                pad=pad,
+                psize=psize,
+                intermediate_dir=sample_intermediate_dir,
+                intermediate_interval=intermediate_interval,
+                data_gradient_scale=effective_data_gradient_scale,
+                trace_file=trace_file,
+                trace_interval=trace_interval,
+                stop_after_outer_steps=stop_after_outer_steps,
+                patch_batch_size=patch_batch_size,
+                sampler=sampler,
+                overlap=patch_overlap,
+                checkpoint_denoiser=checkpoint_denoiser,
+                **sampler_kwargs,
+            )
+        else:
+            raise click.ClickException(f'Unknown sampler: {sampler}')
+        log(f'{sampler} sampler finished.')
 
         images = torch.clamp(images, min=0, max=1)
         images = images[:, pad:pad+image_size, pad:pad+image_size]
