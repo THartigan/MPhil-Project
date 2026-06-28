@@ -1,0 +1,24 @@
+{
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.latex.recipe.default": "first",
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "compile-thesis.sh",
+      "tools": [
+        "compile-thesis.sh"
+      ]
+    }
+  ],
+  "latex-workshop.latex.tools": [
+    {
+      "name": "compile-thesis.sh",
+      "command": "sh",
+      "args": [
+        "./compile-thesis.sh",
+        "compile",
+        "thesis"
+      ],
+      "env": {}
+    }
+  ]
+}

@@ -893,7 +893,7 @@ wish to left align your text}
   \else
       \ifdefined\pdfshellescape
       \ifnum\pdfshellescape=1\relax
-        \immediate\write18{rm -f \jobname.phd-wordcount && if command -v texcount >/dev/null 2>&1; then texcount -inc -sum=1,1,0,0,0,0,0 -nobib -1 \jobname.tex 2>/dev/null | tail -n 1 | sed -e 's/[^0-9]//g' > \jobname.phd-wordcount; else echo N/A > \jobname.phd-wordcount; fi}
+        \immediate\write18{rm -f \jobname.phd-wordcount && if command -v texcount >/dev/null 2>&1; then texcount -inc -sum=1,1,1,0,0,0,0 -nobib -1 \jobname.tex 2>/dev/null | tail -n 1 | sed -e 's/[^0-9]//g' > \jobname.phd-wordcount; else echo N/A > \jobname.phd-wordcount; fi}
         \IfFileExists{\jobname.phd-wordcount}{
           \openin \PHD@wordcountreader=\jobname.phd-wordcount
           \read \PHD@wordcountreader to \PHD@wordcountvalue

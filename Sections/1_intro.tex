@@ -1,0 +1,17 @@
+%!TEX root = ../thesis.tex
+%*******************************************************************************
+%*********************************** First Chapter *****************************
+%*******************************************************************************
+
+\ifpdf
+    \graphicspath{{Chapter1/Figs/Raster/}{Chapter1/Figs/PDF/}{Chapter1/Figs/}}
+\else
+    \graphicspath{{Chapter1/Figs/Vector/}{Chapter1/Figs/}}
+\fi
+
+
+%********************************** %First Section  **************************************
+\chapter{Introduction}
+% \nomenclature[z-PPC]{PPC}{Particles per cell}
+
+Computed Tomography (CT) imaging is widely used in both medicine and industry for investigating the internal structure of objects in a relatively non-destructive way. It works by directing X-rays through a sample from a number of different angles, and measuring their attenuation at each angle. Due to radiation exposure risks, industrial applications are often able to use higher energy X-rays, and take measurements at a greater number of angles (views), than is possible in medical applications. In the medical domain, however, we wish to minimise the radiation dose to the patient, resulting in fewer views being taken, and often at lower X-ray energies. This leads to artifacts from both Gaussian and Poisson noise, as well as from the limited number of views, making it difficult to accurately reconstruct the internal structure of the sample. \cite{ho_denoising_2020}.

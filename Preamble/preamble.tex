@@ -142,6 +142,20 @@
 \setcounter{secnumdepth}{2}
 \setcounter{tocdepth}{2}
 
+% Keep chapters as the semantic top-level thesis division, but make them print
+% like ordinary top-level headings rather than book-style chapter openers.
+\usepackage{titlesec}
+\titleclass{\chapter}{straight}
+\titleformat{\chapter}
+  {\normalfont\Large\bfseries}
+  {\thechapter}
+  {1em}
+  {}
+\titlespacing*{\chapter}
+  {0pt}
+  {3.5ex plus 1ex minus .2ex}
+  {2.3ex plus .2ex}
+
 
 % ******************************* Nomenclature *********************************
 
