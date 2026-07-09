@@ -5,3 +5,106 @@
 \fi
 
 \chapter{Methods}
+
+\section{The Dataset}
+In this work, we use the LIDC-IDRI dataset \cite{lidc} for all experiments. This dataset contains 1018 human chest CT scans as raw CT DICOM \cite{DICOM} images from 1010 patients, with each scan containing many axial slices, and some slices containing cancerous nodules. Before training or reconstruction, we convert these into a processed slice dataset, saving each slice as a $512\times 512$ NumPy array, along with a nodule mask. All but the 512-resolution experiments then downsample these to $256\times256$ resoution during dataloading. Although the dataset contains multiple scans for some patients, the LION processing pipeline keeps only one per pateient, preventing accidental data leakage.
+
+Divisioning into train, validation and test sets is done by sorted patient ID in an 80:10:10 ratio, ensuring that slices from no patient are present across sets. The default PaDIS training regime then selects at most $4$ slices per patient, targeting a balance between nodule-containing and nodule-free slices. This is, however, constrained by the availability of annotations for each patient, so some contribute fewer than $4$ slices. The detailed breakdown is presented in \autoref{tab:dataset-split}.
+
+\begin{table}[ht] 
+    \centering 
+    \begin{tabular}{lccc} 
+        \hline \textbf{Split} & \textbf{Patient IDs} & \textbf{Images in 4-slice regime} & \textbf{Images in all-slice regime} \\
+        \hline 
+        Train & 809 & 2713 & 189725 \\ 
+        Validation & 101 & 328 & 27426 \\ 
+        Test & 102 & 326 & 25719 \\ 
+        \hline Total & 1012 & 3367 & 242870 \\ 
+        \hline 
+    \end{tabular}
+    \caption{Processed LIDC-IDRI split sizes used in this work. Note that the dataset contains two unused patient IDs.}
+    \label{tab:lidc_split_sizes} 
+\end{table}
+
+\section{Experimental Geometry}
+Throughout all experiment, we use the fan-beam approach explained in \autoref{eq:fan_beam_projection}
+
+\section{Model Training}
+\label{sec:methods-model-training}
+
+In this work, we train three classes of model to aid reconstruction; patch-based diffusion models, whole-image diffusion models, and PnP denoisers. 
+
+\subsection{Diffusion Model Training}
+The learned diffusion priors were trained following the variance-exploding regime described in \autoref{sec:score_based_sdes}, and their denoisers can therefore be converted to scores and used for both unconditional generation and solving inverse problems as explained in \autoref{subsec:diffusion_models_inverse_problems, subsec:padis_approach}.
+
+All of the diffusion denoisers were trained using the U-Net like, noise-conditional NSCN++ model, $F_{\boldsymbol{\phi}}$, developed by Song et. al. \cite{song...}, which allows multi-scale inputs, and predicts denoised images directly. This network passes the noise level to each residual block, and always takes three channel inputs - the noisy image, and the [-1,1] normalised x- and y-coordinates of each pixel. Throughout, we use dropout level 0.05, a base attention channel size of $128$, $4$ residual blocks per level, and attention resolution $16$. These models always use four attention levels, with the patch-based models using $128$, $256$, $256$, and $256$ channels at each level, and the whole-image models using $128$, $256$, $256$, and $512$ channels for greater coarse-level capacity.
+
+All diffusion models were trained using the Adam optimiser \cite{kingma}, with a learning rate of $2 \times 10^{-4}$ for diffusion models, and the EDM preconditioning described in \autoref{subsec:edm_preconditioning} with $\sigma_{\mathrm{data}}=0.5$. The whole-image models were trained for $24$ hours, and patch-based models trained for $12$ hours on an RTX6000 Pro GPU. In both cases, the learning-rate ramped up over the first 10 million seen training examples or patches. During diffusion model training, noise scales were sampled from an EDM-style log-normal distribution, and truncated to $\sigma\in[0.002,40]$, with $\log\sigma\sim\mathcal{N}(-1.2,1.2^2)$.
+
+Using these conventions, whole-image diffuson denoisers were trained to denoise entire $256\times 256$ CT slices, and patch-based denoisers were trained for images of size $256\times 256$ and $512\times 512$ with patch sizes $56\times 56$, $32\times 32$, and $16\times 16$, where selection probabilities for these at each training step are 0.5, 0.3, and 0.2 respectively. Ablation models were also trained using all available processed slices, different patch sizes, and without positional encoding channels. This patch size schedule is used in all experiments apart from those for the patch size ablations, which are detailed in \autoref{tab:patch_size_schedules}.
+
+The diffusion denoisers were evaluated on the validation set throughout training to ensure overfitting did not occur. However, for the final six hours of each run, the validation frequency and intensity was significantly increased, and the checkpoint correspoinding to the minimum validaton loss in this period was used as the final model.
+
+\begin{table}[ht] 
+    \centering 
+    \begin{tabular}{lccc} 
+        \hline 
+        \textbf{Ablation} & \textbf{Sampled patch sizes} & \textbf{Sampling probabilities} & \textbf{Padding width} \\ 
+        \hline 
+        $P=8$ & $8$ & $1.0$ & $8$ \\ 
+        $P=16$ & $8,\ 16$ & $0.3,\ 0.7$ & $16$ \\ 
+        $P=32$ & $8,\ 16,\ 32$ & $0.2,\ 0.3,\ 0.5$ & $32$ \\ 
+        $P=56$ & $16,\ 32,\56$ & $0.2,\ 0.3,\ 0.5$ & $24$ \\ 
+        $P=96$ & $32,\ 64,\ 96$ & $0.2,\ 0.3,\ 0.5$ & $32$ \\ 
+        \hline 
+    \end{tabular} 
+    \caption{Patch-size schedules used for the PaDIS patch-size ablations. Each training step samples one patch size according to the listed probabilities. The $P=56$ row is the default PaDIS patch schedule used for the main 256-resolution patch model.} 
+    \label{tab:patch_size_schedules}
+\end{table}
+
+\subsection{PnP Denoiser Training}
+Two PnP denoisers were trained using the existing PnP-ADMM \cite{chan_plug-and-play_2016} LION implementation, which uses a DRUNet model \cite{zhang_plug-and-play_2021} as the denoiser. At each training step, Gaussian noise is sampled uniformly from $\sigma \in[0,0.05]$ and added to the clean image, from which the model then learns to recover the clean target. 
+
+Each model was trained using the Adam optimiser, a learning rate of $1\times 10^{-4}$ for $100$ epochs, batch size $8$, and MSE denoising loss. One model was trained with only the noisy image as input, and another was trained with the noise level additionally provided as a constant image channel. Both used $64$ internal chanels, $4$ blocks per level, bias-free convolutions, and leaky-ReLU activations. Validation was performed after each epoch using the same Gaussian denoising objective, and for each model, the checkpoint corresponding to the lowest validation loss was used for inference experiments.
+
+\section{Reconstructor Implementation}
+- Implemented in LION
+- Produced three implementation tracks: Explicit paper implementation, public-repo matching setup, and one which uses correct operator normalisations to increase cross-problem reliability, as described in \ref{subsec:lion-physics}.
+- Created LION-physics implementations for all experiments, but only paper and public-repo matching implementations for those which were actually described in sufficient detail for reproduction in those respective soruces. This is summarised in \autoref{tab:implemented-methods}.
+
+
+\begin{table}[ht]
+  \centering
+  \caption{Reconstruction methods which were possible to implement in the same manner as described in the original PaDIS paper, or their publicly available codebase, as well as those which were implemented in our customised LION-physics framework.}
+  \label{tab:methods_by_implementation}
+  \begin{tabular}{lccc}
+  \hline
+  \textbf{Method} & \textbf{Paper-style} & \textbf{Public-compatible} & \textbf{LION-physics} \\
+  \hline
+  Baseline FDK              & --             & --             & \(\checkmark\) \\
+  ADMM-TV                   & --             & --             & \(\checkmark\) \\
+  PnP-ADMM                  & --             & --             & \(\checkmark\) \\
+  Whole-image diffusion     & \(\checkmark\) & --             & \(\checkmark\) \\
+  Langevin                  & \(\checkmark\) & \(\checkmark\) & \(\checkmark\) \\
+  Predictor-corrector       & \(\checkmark\) & \(\checkmark\) & \(\checkmark\) \\
+  VE-DDNM                   & \(\checkmark\) & \(\checkmark\) & \(\checkmark\) \\
+  Patch averaging           & --             & \(\checkmark\) & \(\checkmark\) \\
+  Patch stitching           & --             & \(\checkmark\) & \(\checkmark\) \\
+  PaDIS-DPS                 & \(\checkmark\) & \(\checkmark\) & \(\checkmark\) \\
+  \hline
+  \end{tabular}
+\end{table}
+
+\subsection{Public-Compatible Implementations}
+- include correctness checks
+
+\subsection{LION-Physics Implementations}
+
+\subsection{Hyperparameter Tuning}
+
+\section{Experiments}
+a description of the different experiments and their purpose, flagging any differences from the original padis paper.
+
+\section{Metrics}
+
+\section{Compute and Reproducibility}

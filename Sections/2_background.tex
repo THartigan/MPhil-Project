@@ -412,6 +412,33 @@ The VE diffusion approach is a natural fit for medical imaging inverse problems 
 
 We can therefore interpret a VP-denoised prediction, $D_{\boldsymbol{\phi}}(\mathbf{z},\sigma)$ as a clean-image estimate, enabling direct application of medical imaging measurement models, which are defined on the clean images. For example, in CT reconstruction, we can predict the corresponding sinogram as $AD_{\boldsymbol{\phi}}(\mathbf{z},\sigma)$, where $A$ is the CT forward operator \cite{SongMedicalInverse, ChungYeMRI, DPS}.
 
+\subsection{EDM Preconditioning} \label{subsec:edm_preconditioning}
+
+In some cases, we choose not to use a denoising model directly, but instead embed one within a predconditioning framework. This is the case for EDM \cite{Karras_edm}, which wraps a raw neural network, $F_{\boldsymbol{\phi}}$, with scale-dependent input, output and skip coefficients to form a preconditioned denoiser. This gives the raw network a better conditioned learning problem because inputs are normalised to have a similar scale across noise levels, and the network only needs to predict the part of the denoising map not already captured by the skip connection. For a noisy image $\mathbf{z}$ at noise level $\sigma$, this gives
+
+\begin{equation} D_{\boldsymbol{\phi}}(\mathbf{z},\sigma) =
+c_{\mathrm{skip}}(\sigma)\mathbf{z} + c_{\mathrm{out}}(\sigma)
+F_{\boldsymbol{\phi}} \left( c_{\mathrm{in}}(\sigma)\mathbf{z},
+c_{\mathrm{noise}}(\sigma) \right), \label{eq:edm_preconditioned_denoiser}
+\end{equation}
+
+where
+
+\begin{align} c_{\mathrm{in}}(\sigma) &=
+\frac{1}{\sqrt{\sigma^2+\sigma_{\mathrm{data}}^2}}, & c_{\mathrm{skip}}(\sigma)
+&= \frac{\sigma_{\mathrm{data}}^2}{\sigma^2+\sigma_{\mathrm{data}}^2}, \\
+c_{\mathrm{out}}(\sigma) &=
+\frac{\sigma\sigma_{\mathrm{data}}}{\sqrt{\sigma^2+\sigma_{\mathrm{data}}^2}}, &
+c_{\mathrm{noise}}(\sigma) &= \frac{\log \sigma}{4}, \label{eq:
+edm_preconditioning_coefficients} \end{align}
+
+and $\sigma_{\mathrm{data}}$ is an estimate of the standard deviation of
+clean training images. The coefficient $c_{\mathrm{in}}$ rescales the noisy
+input before it is passed to $F_{\boldsymbol{\phi}}$, while $c_{\mathrm{noise}}$
+convets the noise level to a logarithmic scale. 
+
+The skip connection allows the denoiser make only small adjustments at low noise levels, whereas at high noise levels, $c_{\mathrm{skip}}$ becomes small, so the denoised estimate relies more heavily on the learned network output. The coefficient $c_{\mathrm{out}}$ then scales this output so that it has the appropriate magnitude for the current noise level. Once the wrapped denoiser $D_{\boldsymbol{\phi}}$ has been formed, a score estimate can still be given by \autoref{eq:score_from_denoiser}.
+
 \subsection{The PaDIS Approach}
 \label{subsec:padis_approach}
 
@@ -760,7 +787,7 @@ then we can construct a data consistency update with
 \label{eq:dps_data_update}
 \end{equation}
 
-which can then again be followed by at least one Langevin prior step as in \eqref{eq:Langevin_step}. This will be referred to as either the DPS-Langevin, or the PaDIS sampling method throughout.
+which can then again be followed by at least one Langevin prior step as in \eqref{eq:Langevin_step}. This will generally be referred to as DPS-Langevin reconstruction. However, when we use the PaDIS score computation \autoref{eq:padis_score_estimate}, it will be referred to as the PaDIS reconstruction method.
 
 By discretising the reverse-time SDE \eqref{eq:reverse_time_sde}, we can derive an alternative prediction step moving from the defined noise level $\sigma_k$ to $\sigma_{k+1}$ as
 

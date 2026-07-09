@@ -1,3 +1,21 @@
+@misc{chan_plug-and-play_2016,
+  title = {Plug-and-{{Play ADMM}} for {{Image Restoration}}: {{Fixed Point Convergence}} and {{Applications}}},
+  shorttitle = {Plug-and-{{Play ADMM}} for {{Image Restoration}}},
+  author = {Chan, Stanley H. and Wang, Xiran and Elgendy, Omar A.},
+  year = 2016,
+  month = nov,
+  number = {arXiv:1605.01710},
+  eprint = {1605.01710},
+  primaryclass = {cs.CV},
+  publisher = {arXiv},
+  doi = {10.48550/arXiv.1605.01710},
+  urldate = {2026-07-09},
+  abstract = {Alternating direction method of multiplier (ADMM) is a widely used algorithm for solving constrained optimization problems in image restoration. Among many useful features, one critical feature of the ADMM algorithm is its modular structure which allows one to plug in any off-the-shelf image denoising algorithm for a subproblem in the ADMM algorithm. Because of the plug-in nature, this type of ADMM algorithms is coined the name "Plug-and-Play ADMM". Plug-and-Play ADMM has demonstrated promising empirical results in a number of recent papers. However, it is unclear under what conditions and by using what denoising algorithms would it guarantee convergence. Also, since Plug-and-Play ADMM uses a specific way to split the variables, it is unclear if fast implementation can be made for common Gaussian and Poissonian image restoration problems. In this paper, we propose a Plug-and-Play ADMM algorithm with provable fixed point convergence. We show that for any denoising algorithm satisfying an asymptotic criteria, called bounded denoisers, Plug-and-Play ADMM converges to a fixed point under a continuation scheme. We also present fast implementations for two image restoration problems on super-resolution and single-photon imaging. We compare Plug-and-Play ADMM with state-of-the-art algorithms in each problem type, and demonstrate promising experimental results of the algorithm.},
+  archiveprefix = {arXiv},
+  keywords = {Computer Science - Computer Vision and Pattern Recognition},
+  file = {/Users/thomas/Zotero/storage/75DYYAVN/Chan et al. - 2016 - Plug-and-Play ADMM for Image Restoration Fixed Point Convergence and Applications.pdf;/Users/thomas/Zotero/storage/TFKY79E9/1605.html}
+}
+
 @misc{ho_denoising_2020,
   title = {Denoising {{Diffusion Probabilistic Models}}},
   author = {Ho, Jonathan and Jain, Ajay and Abbeel, Pieter},
@@ -172,4 +190,21 @@
   abstract = {Denoising autoencoders have been previously shown to be competitive alternatives to Restricted Boltzmann Machines for unsupervised pre-training of each layer of a deep architecture. We show that a simple denoising autoencoder training criterion is equivalent to matching the score (with respect to the data) of a specific energy based model to that of a non-parametric Parzen density estimator of the data. This yields several useful insights. It defines a proper probabilistic model for the denoising autoencoder technique which makes it in principle possible to sample from them or to rank examples by their energy. It suggests a different way to apply score matching that is related to learning to denoise and does not require computing second derivatives. It justifies the use of tied weights between the encoder and decoder, and suggests ways to extend the success of denoising autoencoders to a larger family of energy-based models.},
   langid = {english},
   file = {/Users/thomas/Zotero/storage/TN8N3C3Y/Vincent - 2011 - A Connection Between Score Matching and Denoising Autoencoders.pdf}
+}
+
+@misc{zhang_plug-and-play_2021,
+  title = {Plug-and-{{Play Image Restoration}} with {{Deep Denoiser Prior}}},
+  author = {Zhang, Kai and Li, Yawei and Zuo, Wangmeng and Zhang, Lei and Gool, Luc Van and Timofte, Radu},
+  year = 2021,
+  month = jul,
+  number = {arXiv:2008.13751},
+  eprint = {2008.13751},
+  primaryclass = {eess.IV},
+  publisher = {arXiv},
+  doi = {10.48550/arXiv.2008.13751},
+  urldate = {2026-07-09},
+  abstract = {Recent works on plug-and-play image restoration have shown that a denoiser can implicitly serve as the image prior for model-based methods to solve many inverse problems. Such a property induces considerable advantages for plug-and-play image restoration (e.g., integrating the flexibility of model-based method and effectiveness of learning-based methods) when the denoiser is discriminatively learned via deep convolutional neural network (CNN) with large modeling capacity. However, while deeper and larger CNN models are rapidly gaining popularity, existing plug-and-play image restoration hinders its performance due to the lack of suitable denoiser prior. In order to push the limits of plug-and-play image restoration, we set up a benchmark deep denoiser prior by training a highly flexible and effective CNN denoiser. We then plug the deep denoiser prior as a modular part into a half quadratic splitting based iterative algorithm to solve various image restoration problems. We, meanwhile, provide a thorough analysis of parameter setting, intermediate results and empirical convergence to better understand the working mechanism. Experimental results on three representative image restoration tasks, including deblurring, super-resolution and demosaicing, demonstrate that the proposed plug-and-play image restoration with deep denoiser prior not only significantly outperforms other state-of-the-art model-based methods but also achieves competitive or even superior performance against state-of-the-art learning-based methods. The source code is available at https://github.com/cszn/DPIR.},
+  archiveprefix = {arXiv},
+  keywords = {Computer Science - Computer Vision and Pattern Recognition,Electrical Engineering and Systems Science - Image and Video Processing},
+  file = {/Users/thomas/Zotero/storage/VP2YIDGH/Zhang et al. - 2021 - Plug-and-Play Image Restoration with Deep Denoiser Prior.pdf;/Users/thomas/Zotero/storage/A5PZ6YMA/2008.html}
 }
