@@ -2,312 +2,802 @@
 \else     \graphicspath{{Sections/2_background_figs/Vector/}{Sections/2_background_figs/}}
 \fi
 
-% \chapter{Background} \label{chap:background}
-
-% Here, we present a summary of the theory and literature required to understand
-% the experiments presented in this work. We focus on CT reconstruction, diffusion
-% models and their use in solving inverse problems, and the PaDIS method. We then
-% summarise the literature relevant to PaDIS, including both its motivators and
-% derivatives. The formulation presented in Section~\ref{sec:basics} summarises
-% the key points presented by Kak and Stanley~\cite{Kak_Stanley}, and utilises
-% their notation.
-
-% \section{Basics of Computed Tomography} \label{sec:basics}
-
-% In X-ray CT, an object is illuminated by X-rays from multiple angles, with the
-% intensity of radiation transmitted through the object measured by detectors on
-% the opposite side of the object. Through this method, we aim to reconstruct a
-% spatial distribution of the linear attenuation coefficient, written $f(x,y)$ in
-% the two-dimensional case, and with units of inverse length. This gives the
-% probability per unit path length that an X-ray photon is removed from the beam
-% by absorption or scattering. Therefore, assuming X-rays are monoenergetic, the
-% transmitted intensity along a ray $L$ should obey the Beer-Lambert law,
-% \begin{equation} I=I_0 \exp\left(-\int_L f(x,y) \, ds\right), \end{equation}
-% where $I_0$ is the intensity of radiation incident on the object, $I$ is the
-% detected intensity, and $ds$ denotes integration along the ray. Taking
-% logarithms then gives the linearised projection \begin{equation}
-% P=-\log\left(\frac{I}{I_0}\right)=\int_L f(x,y)\, ds, \end{equation} meaning
-% log-normalised CT measurements are approximated by a line integral through the
-% attenuation image. This approach assumes that beams are narrow, monoenergetic
-% and non-diffracting, and neglects scattering, beam hardening and finite aperture
-% effects, all of which contribute in clinical CT. However, it provides a
-% tractable mathematical basis within which to consider reconstruction algorithms.
-
-% \section{Detector Geometries} \label{sec:detector-geometries}
-
-% \section{Line Integrals, Projections and Sinograms} \label{sec:
-% line-integrals-projections-sinograms}
-
-% For a fixed projection angle $\theta$, we can define a line in the image plane
-% by \begin{equation} x\cos \theta + y\sin \theta=t, \label{eq:line_t}
-% \end{equation} where $t$ is the perpendicular distance of the line from the
-% origin, as shown in Figure~\ref{fig:line_integral}. The integral over this line
-% can then be denoted as \begin{equation} P_\theta(t) = \int_{L_{(\theta,t)}} f(x,
-% y) \, ds, \end{equation} or equivalently in Dirac delta form, \begin{equation}
-% P_\theta(t)=\int_{-\infty}^{\infty} \int_{-\infty}^{\infty} f(x,y)\delta(x\cos
-% \theta+ y\sin \theta-t) \, dx\, dy. \end{equation} Notably, the projection
-% $P_\theta(t)$ is therefore also the Radon transform~\cite{radon} of $f(x,y)$ at
-% angle $\theta$. We collect a line or grid of these projections simultaneously,
-% each corresponding to the same $\theta$ alignment, but different values of $t$.
-% In a hypothetical parallel-beam scan, all of these $\theta$-aligned rays are
-% parallel, whereas in a realistic fan-beam or cone-beam scan, the angle refers to
-% the central projection angle, from which other rays diverge.
-
-% In practice, we sample these projection lines from $K$ different angular views,
-% $\theta_1, \theta_2, \dots, \theta_K$, and collect the projections within $N$
-% detector bins corresponding to $t_1, t_2, \dots, t_N$, forming an array of
-% measurements called a sinogram, denoted \begin{equation} Y_{j,
-% i}=P_{\theta_i}(t_j), \quad i=1,\dots, K, \quad j=1,\dots, N. \end{equation}
-% Here, each column is a line of projections at directed angle $\theta$, and each
-% row corresponds to one detector bin. By vectorising the image of $f(x,y)$ as
-% $\mathbf{x}\in \mathbb{R}^n$, and the sinogram as $\mathbf{y}\in \mathbb{R}^m$,
-% the discretised CT forward model can be written as \begin{equation}
-% \mathbf{y}=A\mathbf{x}+\boldsymbol{\eta}, \label{eq:forward-model}
-% \end{equation} where $A\in \mathbb{R}^{m \times n}$ is the discretised forward
-% projection operator, $\boldsymbol{\eta}$ encodes noise and modelling errors, and
-% $m=KN$ in 2D. We can then express this operator $A$ explicitly by denoting an
-% image pixel $\ell$ by $\Omega_\ell$, and using the pixel basis function
-% \begin{equation} \phi_\ell(x,y)= \begin{cases} 1, & (x,y)\in \Omega_\ell,\\ 0, &
-% \text{otherwise}, \end{cases} \end{equation} such that we can approximate the
-% attenuation field as \begin{equation} f(x,y)\approx \sum_{\ell=1}^n x_\ell
-% \phi_\ell(x,y), \end{equation} where $x_\ell$ is the value of pixel $\ell$.
-% Therefore, substituting into the line integral and comparing with
-% Equation~\eqref{eq:forward-model} gives \begin{align} P_{\theta_i}(t_j) &\approx
-% \sum_{\ell=1}^n x_\ell \int_{L_{(\theta_i,t_j)}} \phi_\ell(x,y)\,ds,\\ \implies
-% A_{(j,i),\ell} &=\int_{L_{(\theta_i, t_j)}}\phi_\ell(x,y)\, ds, \end{align} so
-% each row of $A$ corresponds to a single measured ray, with entries encoding the
-% path length of that ray within each image pixel. This matrix is generally
-% extremely large, and impractical to store or manipulate.
-
-% \section{The Fourier Slice Theorem} \label{sec:fourier-slice-theorem}
-
-% Using the perpendicular distance of a ray from the origin, Equation~\eqref{eq:
-% line_t}, and the distance along that ray given by \begin{equation} s=-x\sin
-% \theta+ y \cos\theta, \end{equation} give the projection at angle $\theta$ as
-% \begin{equation} P_\theta(t)= \int_{-\infty}^{\infty} f(t\cos\theta-s\sin\theta,
-% \;t\sin\theta+s\cos\theta)\,ds. \end{equation} Taking the Fourier transform of
-% this with respect to $t$ then gives \begin{equation} S_\theta(\omega) =
-% \int_{-\infty}^{\infty}\int_{-\infty}^{\infty} f(t\cos\theta-s\sin\theta,\;
-% t\sin\theta+s\cos\theta) e^{-2\pi i \omega t} \,ds\,dt, \end{equation} so
-% converting to the $(x,y)$ coordinate system gives \begin{equation}
-% S_\theta(\omega) = \int_{-\infty}^{\infty}\int_{-\infty}^{\infty} f(x,y)e^{-2\pi
-% i \omega(x\cos\theta+y\sin\theta)} \,dx\,dy = F(\omega \cos \theta, \omega \sin
-% \theta). \end{equation} Therefore, the Fourier transform of a projection gives
-% the two-dimensional Fourier transform of the object along the radial line at the
-% same angle.
-
-% \section{Dosage and Noise} \label{sec:dosage-and-noise}
-
-% The radiation dose imparted on a patient is directly proportional to the total
-% energy deposited in the tissue. For this reason, it is also directly
-% proportional to the energy of the photons used, the number of photons released
-% at each view, and the number of views acquired. Dosage can therefore be reduced
-% by decreasing any of these properties. However, these each decrease imaging
-% quality.
-
-% Measurement noise is intrinsically linked to the intensity of radiation used.
-% If $N_0$ photons are incident on the sample along a ray with projection value
-% $p$, then we expect to detect \begin{equation} \bar N = N_0 \exp(-p).
-% \end{equation} As this is a counting experiment, the noise due to counting
-% errors can be approximated as Poisson such that \begin{equation} N\sim
-% \operatorname{Poisson}(\bar N). \end{equation} The projection estimate is
-% \begin{equation} \hat p =-\log \left(\frac{N}{N_0}\right), \end{equation} so at
-% high photon counts where $\operatorname{Poisson}(\bar N)\approx \mathcal{N}(\bar
-% N, \bar N)$, Taylor expansion gives \begin{equation} \hat p \approx p+\eta,
-% \quad \eta \sim \mathcal N\left(0, \frac{1}{\bar N}\right). \end{equation} At
-% low photon counts, however, we may have $N=0$, in which case $\hat p=-\log 0$,
-% which is undefined. Furthermore, relative fluctuations are large, preventing
-% Taylor expansion, and in general, the noise after the logarithm becomes
-% non-Gaussian, signal-dependent, biased and possibly undefined~\cite{}, meaning
-% this domain is often better to model with the Poisson likelihood. Decreasing
-% intensity therefore increases the difficulty in modelling, and is not discussed
-% in detail in this work. However, interesting advances in using diffusion models
-% trained with these sorts of priors can be found at~\cite{}.
-
-% Decreasing the number of views also decreases the dosage, but in accordance
-% with the Fourier slice theorem, this also limits...
-
 \chapter{Background}
+\label{ch:background}
 
-Here, we present a summary of the theory and literature required to understand the experiments presented in this work. We focus on CT reconstruction, diffusion models and their use in solving inverse problems, and the PaDIS method. We then summarise the literature relevant to PaDIS, including both its motivators and derivatives. The formulation presented in \ref{sec:basics} summarises the key points presented by Kak and Stanley \ref{Kak_Stanley}, and utilises their notation.
+Here, we present a summary of the theory and literature required to understand the experiments presented in this work. We focus on CT reconstruction, diffusion models and their use in solving inverse problems, and the PaDIS method. We then summarise the literature relevant to PaDIS, including both its motivators and derivatives. The formulation presented in \ref{sec:basics} summarises the key points presented by Kak and Slaney \cite{Kak_Stanley}, and utilises their notation.
 
 \section{Computed Tomography}
 \label{sec:basics}
 
-In X-ray CT, an object is illuminated by X-rays from multiple angles, with the intensity of radiation transmitted through the object measured by detectors the opposite side of the object. Through this method, we aim to reconstruct a spatial distribution of the linear attenuation coefficient, written $f(x,y)$ in the two-dimensional case, and with units of inverse length. This gives the probability per unit path length that an X-ray photon is removed from the beam by absorption or scattering. Therefore, assuming X-rays are monoenergetic, the transmitted intensity along a ray $L$ should obey the Beer-Lambert law,
-\[
+In X-ray CT, an object is illuminated by X-rays from multiple angles, with the intensity of radiation transmitted through the object measured by detectors the opposite side of the object. Through this method, we aim to reconstruct a spatial distribution of the linear attenuation coefficient, written $f(x,y)$ in the two-dimensional case, and with units of inverse length. This gives the probability per unit path length that an X-ray photon is removed from the beam by absorption or scattering. Therefore, assuming X-rays are monoenergetic, the transmitted intensity along a ray $L$ should obey the Beer-Lambert law \cite{},
+
+\begin{equation}
 I=I_0 \exp\left(-\int_L f(x,y) \, ds\right),
-\]
+\label{eq:beer_lambert}
+\end{equation}
+
 where $I_0$ is the intensity of radiation incident on the object, $I$ is the detected intensity, and $ds$ denotes integration along the ray. Taking logarithms therefore then gives the linearised projection
-\[
+
+\begin{equation}
 P=-\log\left(\frac{I}{I_0}\right)=\int_Lf(x,y)\, ds,
-\]
+\label{eq:linearised_projection}
+\end{equation}
+
 meaning log-normalised CT measurements are approximated by a line integral through the attenuation image. This approach assumes that beams are narrow, monoenergetic and non-diffracting, and neglects scattering, beam hardening and finite aperture effects, all of which contribute in clinical CT. However, it provides a tractable mathematical basis within which to consider reconstruction algorithms.
 
 \subsection{Detector Geometries}
+\label{subsec:detector_geometries}
 
 There are three common CT detector geometries; parallel-beam, fan-beam, and cone-beam. Parallel-beam assumes we have a linear array of X-ray sources, each focussed solely on a detector placed on the other side of the sample. These rays are therefore parallel, as illustrated in Figure \ref{fig:geometries}a. This is impractical to implement clinically, but allows for tractable mathematics for the Radon transform and the Fourier slice theorem.
 
 Fan-beam CT is often used in practice, and utilises a point source from which a fan-blade of emissions are measured by an line of detectors. Writing the source position as $S(\beta)$ for a source angle $\beta$, and $d(\beta, \gamma)$ as the unit direction of a ray labelled by fan angle $\gamma$ allows us to write a fan-beam projection as
-\[
+
+\begin{equation}
 R_\beta(\gamma) = \int_0^\infty f(S(\beta)+sd(\beta, \gamma))\, ds,
-\]
+\label{eq:fan_beam_projection}
+\end{equation}
+
 where we assume the sample has compact support such that $f(\mathbf{r})=0$ outside of the object.
 
-Cone-beam CT extends this to three dimensions, again using a point source, but now a two-dimensional array of detectors with coordinates labeled $u$ and $v$, such that the cone-beam projection has the form
-\[
+Cone-beam CT extends this to three dimensions, again using a point source, but now a two-dimensional array of detectors with coordinates labelled $u$ and $v$, such that the cone-beam projection has the form
+
+\begin{equation}
 R_\beta(u,v)=\int_0^\infty f(S(\beta)+sd(\beta, u,v))\, ds.
-\]
+\label{eq:cone_beam_projection}
+\end{equation}
+
 Note, however, that by restricting the cone-beam geometry to a single strip of detectors recovers the fan-beam geometry.
 
 \subsection{Line Integrals, Projections and Sinograms}
+\label{subsec:line_integrals_projections_sinograms}
 
 For a fixed projection angle $\theta$, we can define a line in the image plane by
+
 \begin{equation}
 x\cos \theta + y\sin \theta=t,
 \label{eq:line_t}
 \end{equation}
+
 where $t$ is the perpendicular distance of the line from the origin, as shown in Figure \ref{fig:line_integral}. The integral over this line can then be denoted as
+
 \begin{equation}
 P_\theta(t) = \int_{L_{(\theta,t)}} f(x,y) \, ds,
-\label{eq:line_integral}
+\label{eq:projection_line_integral}
 \end{equation}
+
 or equivalently in Dirac delta form,
-\[
+
+\begin{equation}
 P_\theta(t)=\int_{-\infty}^\infty \int_{-\infty}^\infty  f(x,y)\delta(x\cos \theta+ y\sin \theta-t) \, dx\, dy.
-\]
+\label{eq:radon_delta_form}
+\end{equation}
+
 Notably, the projection $P_\theta(t)$ is therefore also the Radon transform \cite{radon} of $f(x,y)$ at angle $\theta$. We collect a line or grid of these projections simultaneously, each corresponding to the same $\theta$ alignment, but different values of $t$. In a hypothetical parallel-beam scan, all of these $\theta$-aligned rays are parallel, whereas in a realistic fan-beam or cone-beam scan, the angle refers to the central projection angle, from which other rays diverge.
 
-In practice, we sample these projection lines from $K$ different angular views, $\theta_1, \theta_2, \dots, \theta_K$, and collect the projections within $N$ detector bins corresponding to $t_1, t_2, \dots t_N$, forming an array of measurements called a sinogram, denoted
-\[
-Y_{j,i}=P_{\theta_i}(t_j), \quad i=1,\dots, K, \quad j=1,\dots, N.
-\]
-Here, each column is a line of projections at directed angle $\theta$, and each row corresponds to one detector bin. By vectorising the image of $f(x,y)$ as $\mathbf{x}\in \mathbb{R}^n$, and the sinogram as $\mathbf{y}\in \mathbb{R}^m$, the discretised CT forward model can be written as
+In practice, we sample these projection lines from $N_\theta$ different angular views, $\theta_1, \theta_2, \dots, \theta_{N_\theta}$, and collect the projections within $N_t$ detector bins corresponding to $t_1, t_2, \dots t_{N_t}$, forming an array of measurements called a sinogram, denoted
+
+\begin{equation}
+Y_{j,i}=P_{\theta_i}(t_j), \quad i=1,\dots, N_\theta, \quad j=1,\dots, N_t.
+\label{eq:sinogram_entries}
+\end{equation}
+
+Here, each column is a line of projections at directed angle $\theta_i$, and each row corresponds to one detector bin. By vectorising the image of $f(x,y)$ as $\mathbf{x}\in \mathbb{R}^n$, and the sinogram as $\mathbf{y}\in \mathbb{R}^m$, the discretised CT forward model can be written as
+
 \begin{equation}
 \mathbf{y}=A\mathbf{x}+\boldsymbol{\eta},
 \label{eq:forward-model}
 \end{equation}
-where $A\in \mathbb{R}^{m \times n}$ is the discretised forward projection operator, $\boldsymbol{\eta}$ encodes noise and modelling errors, and $m=KN$ in 2D. We can then express this operator $A$ explicitly by denoting an image pixel $\ell$ by $\Omega_\ell$, and using the pixel basis function
-\[
-\phi_\ell(x,y)=
-\begin{cases}
-1, & (x,y)\in \Omega_\ell,\\
-0, & \text{otherwise},
+
+where $A\in \mathbb{R}^{m \times n}$ is the discretised forward projection operator, $\boldsymbol{\eta}$ encodes noise and modelling errors, and $m=N_\theta N_t$ in 2D. We can then express this operator $A$ explicitly by denoting an image pixel $\ell$ by $\Omega_\ell$, and using the pixel basis function
+
+\begin{equation}
+\varphi_\ell(x,y)=  
+\begin{cases}  
+1, & (x,y)\in \Omega_\ell,\\ 
+0, & \text{otherwise},  
 \end{cases}
-\]
-such that we can approximate the attenuation field as
-\[
-f(x,y)\approx \sum_{\ell=1}^n x_\ell \phi_\ell(x,y),
-\]
-where $x_l$ is the value of pixel $l$. Therefore, substituting into \ref{eq:line_integral} and then comparing with \ref{eq:forward-model} gives
+\label{eq:pixel_basis}
+\end{equation}
+
+such that we can approximate the attenuation field as 
+
+\begin{equation}
+f(x,y)\approx \sum_{\ell=1}^n x_\ell \varphi_\ell(x,y),
+\label{eq:pixel_expansion}
+\end{equation}
+
+where $x_\ell$ is the value of pixel $\ell$. Therefore, substituting into \eqref{eq:line_t} and then comparing with \eqref{eq:forward-model} gives
+
 \begin{align}
-P_{\theta_i}(t_j)
-&\approx
-\sum_{\ell=1}^n x_\ell
-\int_{L_{(\theta_i,t_j)}} \phi_\ell(x,y)\,ds\\
-\implies A_{(j,i),\ell}&=\int_{L_{(\theta_i, t_j)}}\phi_\ell(x,y)\, ds,
+P_{\theta_i}(t_j)  
+&\approx  
+\sum_{\ell=1}^n x_\ell  
+\int_{L_{(\theta_i,t_j)}} \varphi_\ell(x,y)\,ds\\
+\implies A_{(j,i),\ell}&=\int_{L_{(\theta_i, t_j)}}\varphi_\ell(x,y)\, ds,
+\label{eq:system_matrix_entries}
 \end{align}
+
 so each row of $A$ corresponds to a single measured ray, with entries encoding the path length of that ray within each image pixel. This matrix is generally extremely large, and impractical to store or manipulate.
 
 \subsection{The Fourier Slice Theorem}
+\label{subsec:fourier_slice_theorem}
 
 Using the perpendicular distance of a ray from the origin, \eqref{eq:line_t} and the distance along that ray given by
-\[
+
+\begin{equation}
 s=-x\sin \theta+ y \cos\theta
-\]
+\label{eq:ray_coordinate_s}
+\end{equation}
+
 give the projection at angle $\theta$ as
-\[
+
+\begin{equation}
 P_\theta(t)=
 \int_{-\infty}^{\infty}
 f(t\cos\theta-s\sin\theta,\;t\sin\theta+s\cos\theta)\,ds.
-\]
-Taking the Fourier transform of this with respect to $t$ then gives
-\[
+\label{eq:projection_rotated_coordinates}
+\end{equation}
+
+Taking the Fourier transform of this with respect to $t$ then gives a Fourier slice,
+
+\begin{equation}
 S_\theta(\omega)
 =
 \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}
 f(t\cos\theta-s\sin\theta,\;t\sin\theta+s\cos\theta)
 e^{-2\pi i \omega t}
 \,ds\,dt,
-\]
+\label{eq:projection_fourier_transform}
+\end{equation}
+
 so converting to the $(x,y)$ coordinate system gives
-\[
+
+\begin{equation}
 S_\theta(\omega)
 =
 \int_{-\infty}^{\infty}\int_{-\infty}^{\infty}
 f(x,y)e^{-2\pi i\omega(x\cos\theta+y\sin\theta)}
 \,dx\,dy = F(\omega \cos \theta, \omega \sin \theta).
-\]
+\label{eq:fourier_slice_theorem}
+\end{equation}
+
 Therefore, the Fourier transform of a projection gives the two-dimensional Fourier transform of the object along the radial line at the same angle, as illustrated in Figure \ref{fig:fourier_slice_theorem}.
 
 \subsection{Dosage and Noise}
+\label{subsec:dosage_noise}
 
-The radiation dose imparted on a patient is directly proportional to the total energy deposited in the tissue. For this reason, it is also directly proportional to the energy of the photons used, the number of photons released at each view, and the number of views acquired. Dosage can therefore be reduced by decreasing any of these properties. However, these each decrease imaging quality.
+The radiation dose imparted on a patient is directly proportional to the total energy deposited in the tissue. For this reason, it is also directly proportional to the energy of the photons used, the number of photons released at each view, and the number of views acquired \cite{}. Dosage can therefore be reduced by decreasing any of these properties. However, these each decrease imaging quality.
 
-Measurement noise is intrinsically linked to the intensity of radiation used. If $N_0$ photons are incident on the sample along a ray with projection value $p$, then we expect to detect
-\[
-\bar N = N_0 \exp(-p).
-\]
+Measurement noise is intrinsically linked to the intensity of radiation used. If $C_0$ photons are incident on the sample along a ray with projection value $P$, then we expect to detect
+
+\begin{equation}
+\bar C = C_0 \exp(-P).
+\label{eq:expected_photon_count}
+\end{equation}
+
 As this is a counting experiment, the noise due to counting errors can be approximated as Poisson such that
-\[
-N\sim \operatorname{Poisson}(\bar N).
-\]
-The projection estimate,
-\[
-\hat p =-\log \left(\frac{N}{N_0}\right),
-\]
-so at high photon counts where the $\operatorname{Poisson}(\bar N)\approx \mathcal{N}(\bar N, \bar N)$, Taylor expansion gives
-\[
-\hat p \approx p+\eta, \quad \eta \sim \mathcal N\left(0, \frac{1}{\bar N}\right),
-\]
-at low photon counts (intensities), however, we may have $N=0$, in which case $\hat p=-\log 0$, which is undefined. Furthermore, relative fluctuations are large, preventing Taylor expansion, and in general, the noise after the logarithm becomes non-gaussian, signal-dependent, biased and possibly undefined \cite{}, meaning this domain is often better to model with the Poisson likelihood. Decreasing intensity therefore increases the difficulty in modelling, and is not discussed in detail in this work. However, interesting advances in using diffusion models trained with these sorts of priors can be found at \cite{}.
 
-Decreasing the number of views also decreases the dosage, but in accordance with the Fourier slice theorem, this also limits the angular coverage of the Fourier space corresponding to $f(x,y)$, with only a finite set of radial Fourier lines being directly sampled. The unsampled angular regions must therefore be inferred by a reconstruction algorithm or a prior, motivating the use of the learned image priors discussed in \S\ref{sec:Diffusion_Models}.
+\begin{equation}
+C\sim \operatorname{Poisson}(\bar C).
+\label{eq:poisson_photon_count}
+\end{equation}
+
+The projection estimate,
+
+\begin{equation}
+\hat P =-\log \left(\frac{C}{C_0}\right),
+\label{eq:projection_estimate_photon_count}
+\end{equation}
+
+so at high photon counts where $\operatorname{Poisson}(\bar C)\approx \mathcal{N}(\bar C, \bar C)$, Taylor expansion gives
+
+\begin{equation}
+\hat P \approx P+\eta, \quad \eta \sim \mathcal N\left(0, \frac{1}{\bar C}\right),
+\label{eq:log_projection_gaussian_approximation}
+\end{equation}
+
+at low photon counts (intensities), however, we may have $C=0$, in which case $\hat P=-\log 0$, which is undefined. Furthermore, relative fluctuations are large, preventing Taylor expansion, and in general, the noise after the logarithm becomes non-gaussian, signal-dependent, biased and possibly undefined \cite{}, meaning this domain is often better to model with the Poisson likelihood. Decreasing intensity therefore increases the difficulty in modelling, and is not discussed in detail in this work. However, interesting advances in using diffusion models trained with these sorts of priors can be found at \cite{}.
+
+Decreasing the number of views also decreases the dosage, but in accordance with the Fourier slice theorem, this also limits the angular coverage of the Fourier space corresponding to $f(x,y)$, with only a finite set of radial Fourier lines being directly sampled. The unsampled angular regions must therefore be inferred by a reconstruction algorithm or a prior, motivating the use of the learned image priors discussed in Section~\ref{sec:diffusion_models}. If using a direct reconstruction approach, however, this lack of information can lead to streak artefacts and poorly defined edges where high-frequency Fourier information is not available.
 
 \subsection{Hounsfield Units}
+\label{subsec:hounsfield_units}
 
-Medical CT images are often displayed in Hounsfield units (HU) with restricted ranges. These normalise attenuation values with respect to water and air such that
-\[
+Medical CT images are often displayed in Hounsfield units (HU) with restricted ranges \cite{}. These normalise attenuation values with respect to water and air such that
+
+\begin{equation}
 \text{HU}=1000\frac{\mu - \mu_\text{water}}{\mu_\text{water}-\mu_\text{air}}\approx 1000\left(\frac{\mu}{\mu_\text{water}}-1\right),
-\]
+\label{eq:hounsfield_units}
+\end{equation}
+
 giving water a value around 0 HU and air around -1000 HU.
 
 \section{Diffusion Models}
-\label{sec:Diffusion_Models}
+\label{sec:diffusion_models}
 
 A diffusion model is a constrained version of a Variational Autoencoder \cite{} where a fixed encoder is used to gradually corrupt data, and a learned decoder acts to reverse this process. Where $\mathbf{x}$ denotes a clean data sample and $\mathbf{z}_1, \dots, \mathbf{z}_T$ denote noisy latent variables, the forward process is
-\[
-\begin{aligned}
+
+\begin{align}
 \mathbf{z}_1 &= \sqrt{1-\beta_1}\mathbf{x}+\sqrt{\beta_1}\boldsymbol{\epsilon}_1,\\
 \mathbf{z}_t &= \sqrt{1-\beta_t}\mathbf{z}_{t-1}+\sqrt{\beta_t}\boldsymbol{\epsilon}_t,\qquad t=2,\ldots,T,
-\end{aligned}
-\]
-where $\epsilon_t \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and $\beta_t$ is the noise schedule. This can equivalently be written as
-\[
-q(\mathbf{z}_t\mid \mathbf{z}_{t-1})=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{1-\beta_t}\mathbf{z}_{t-1},\beta_t\mathbf{I}\right].
-\]
-By defining
-\[
-\alpha_t=\prod_{s=1}^t(1-\beta_s)
-\]
-and recursively combining Gaussian noise terms, we obtain the diffusion kernel
-\begin{align}
-\mathbf{z}_t&=\sqrt{\alpha_t}\mathbf{x}+\sqrt{1-\alpha_t}\boldsymbol{\epsilon}\\
-\implies
-q(\mathbf{z}_t\mid \mathbf{x})&=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{\alpha_t}\mathbf{x},(1-\alpha_t)\mathbf{I}\right],
+\label{eq:ddpm_forward_process}
 \end{align}
+
+where $\boldsymbol{\epsilon}_t \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and $\beta_t$ is the discrete noise schedule. This can equivalently be written as
+
+\begin{equation}
+q(\mathbf{z}_t\mid \mathbf{z}_{t-1})=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{1-\beta_t}\mathbf{z}_{t-1},\beta_t\mathbf{I}\right].
+\label{eq:ddpm_forward_transition}
+\end{equation}
+
+By defining
+
+\begin{equation}
+\bar{\alpha}_t=\prod_{s=1}^t(1-\beta_s)
+\label{eq:alpha_bar_definition}
+\end{equation}
+
+and recursively combining Gaussian noise terms, we obtain the diffusion kernel
+
+\begin{align}
+\mathbf{z}_t&=\sqrt{\bar{\alpha}_t}\mathbf{x}+\sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}\\
+\implies
+q(\mathbf{z}_t\mid \mathbf{x})&=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{\bar{\alpha}_t}\mathbf{x},(1-\bar{\alpha}_t)\mathbf{I}\right],
+\label{eq:forward_kernel}
+\end{align}
+
 allowing for arbitrary noisy latents to be sampled directly from $\mathbf{x}$ without simulating all previous steps.
 
+The reverse transitions $q(\mathbf{z}_{t-1}|\mathbf{z}_t)$, however, cannot be determined analytically due to the unknown data distribution. Instead, DDPM models learn a Gaussian approximation
+
+\begin{equation}
+p_{\boldsymbol{\phi}}(\mathbf{z}_{t-1}\mid \mathbf{z}_t)=\operatorname{Norm}_{\mathbf{z}_{t-1}}\left[\mathbf{f}_{\boldsymbol{\phi}}(\mathbf{z}_t,t),\sigma_t^2\mathbf{I}\right].
+\label{eq:learned_reverse_transition}
+\end{equation}
+
+Chaining many of these denoising steps allows for construction of the joint distribution, $p_{\boldsymbol{\phi}}(\mathbf{x}, \mathbf{z}_{1, \dots, T})$, which can then be used to derive the evidence lower bound, ELBO such that
+
+\begin{equation}
+\log p_{\boldsymbol{\phi}}(\mathbf{x})\ge \text{ELBO}(\mathbf{x}; \boldsymbol{\phi}).
+\label{eq:elbo_bound}
+\end{equation}
+
+Minimising the negative ELBO therefore trains a network to predict slightly denoised latents $\mathbf{z}_{t-1}$ from the noisier $\mathbf{z}_t$ versions.
+
+Using Bayes theorem along with the Gaussian change of variables identity and the product of two Gaussians combination identity allows us to express
+
+\begin{align}
+q(\mathbf{z}_{t-1}|\mathbf{z}_t, \mathbf{x})
+&=\frac{q(\mathbf{z}_t|\mathbf{z}_{t-1}, \mathbf{x}) q(\mathbf{z}_{t-1}|\mathbf{x})}{q(\mathbf{z}_t|\mathbf{x})}\\
+&=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{1-\beta_t}\mathbf{z}_{t-1}, \beta_t\mathbf{I}\right]\operatorname{Norm}_{\mathbf{z}_{t-1}}\left[\sqrt{\bar{\alpha}_{t-1}}\mathbf{x}, (1-\bar{\alpha}_{t-1})\mathbf{I}\right]\\
+&=\operatorname{Norm}_{\mathbf{z}_{t-1}}\left[\frac{(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_t}\sqrt{1-\beta_t}\mathbf{z}_t+\frac{\sqrt{\bar{\alpha}_{t-1}}\beta_t}{1-\bar{\alpha}_t}\mathbf{x}, \frac{\beta_t(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_t}\mathbf{I}\right].
+\label{eq:reverse_normal}
+\end{align}
+
+Therefore, if the clean image $\mathbf{x}$ were known, the exact reverse transition would also be known. We can therefore equivalently train a denoising model to predict clean images, conditioned on the noisy image and the noise level, $\hat{\mathbf{x}}_\boldsymbol{\phi}$, such that
+
+\begin{equation}
+\mathbf{x}\approx \hat {\mathbf{x}}_{\boldsymbol{\phi}}(\mathbf{z}_t, t).
+\label{eq:x0_prediction}
+\end{equation}
+
+When used in conjunction with \eqref{eq:reverse_normal}, this provides a local denoising direction, allowing repeated movement to slightly cleaner states.
+
+Equation \eqref{eq:forward_kernel} also shows that predicting $\mathbf{x}$ is equivalent to predicting the noise added to it at a given diffusion step, so
+
+\begin{equation}
+\boldsymbol{\epsilon}_{\boldsymbol{\phi}}(\mathbf{z}_t,t)
+=
+\frac{\mathbf{z}_t-\sqrt{\bar{\alpha}_t}\hat{\mathbf{x}}_{\boldsymbol{\phi}}(\mathbf{z}_t,t)}{\sqrt{1-\bar{\alpha}_t}}.
+\label{eq:epsilon_from_x_prediction}
+\end{equation}
+
+In this formulation, we can simplify the ELBO with Gaussian identities and the properties of the KL divergence, giving rise to the standard DDPM training loss \cite{},
+
+\begin{equation}
+\mathcal{L}_{\mathrm{DDPM}}(\boldsymbol{\phi})=
+\mathbb{E}_{\mathbf{x},t,\boldsymbol{\epsilon}}
+\left[
+\left\|
+\boldsymbol{\epsilon}-\boldsymbol{\epsilon}_{\boldsymbol{\phi}}
+\left(\sqrt{\bar{\alpha}_t}\mathbf{x}+\sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon},t\right)
+\right\|_2^2
+\right].
+\label{eq:ddpm_training_loss}
+\end{equation}
+
+Applying Tweedie's formula \cite{} to \eqref{eq:forward_kernel}, and applying the known form of a Gaussian mean, we can then also show that
+
+\begin{equation}
+\nabla_{\mathbf{z}_t}\log p_t(\mathbf{z}_t)
+\approx
+-\frac{\boldsymbol{\epsilon}_{\boldsymbol{\phi}}(\mathbf{z}_t,t)}{\sqrt{1-\bar{\alpha}_t}},
+\label{eq:ddpm_score_from_noise}
+\end{equation}
+
+where we notice the left hand term is equal to the score of the distribution of noisy latents at time $t$. In general, we define this as
+
+\begin{equation}
+\mathbf{s}_t(\mathbf{z})=\nabla_{\mathbf{z}}\log p_t(\mathbf{z}).
+\label{eq:score_definition}
+\end{equation}
+
+Therefore, predicting the slightly denoised latent, $\mathbf{z}_{t-1}$, the fully denoised image, $\mathbf{x}$, the noise, $\boldsymbol{\epsilon}$, and the score, $\nabla_{\mathbf{z}} \log p_t(\mathbf{z})$ are equivalent parameterisations of the same reverse process. For inverse problems, the score parameterisation is particularly useful because it gives a learned prior gradient, which can be exploited in conjunction with measurement-consistency terms from forward models.
+
 \subsection{Score-Based SDEs and Variance-Exploding Models}
+\label{sec:score_based_sdes}
+
+In the continuous-time limit, we can write a noising process as the stochastic differential equation,
+
+\begin{equation}
+d\mathbf{z}=\mathbf{f}(\mathbf{z},\tau)d\tau+g(\tau)d\mathbf{w},
+\label{eq:general_sde}
+\end{equation}
+
+where $\tau\in [0,1]$ denotes the continuous diffusion time, and $\mathbf{w}$ is a Wiener process \cite{}. Anderson and Song \cite{} have shown that where $p_\tau(\mathbf{z})$ denotes the marginal distribution of the noisy latents,
+
+\begin{equation}
+p_\tau(\mathbf{z})=\int p_\tau (\mathbf{z}|\mathbf{x})p_{\mathrm{data}}(\mathbf{x})\, d\mathbf{x},
+\label{eq:marginal}
+\end{equation}
+
+the reverse-time process is
+
+\begin{equation}
+d\mathbf{z}=\left[\mathbf{f}(\mathbf{z},\tau)-g(\tau)^2\nabla_{\mathbf{z}}\log p_\tau(\mathbf{z})\right]d\tau+g(\tau)d\bar{\mathbf{w}},
+\label{eq:reverse_time_sde}
+\end{equation}
+
+where time is integrated backwards and $d\bar {\mathbf{w}}$ is the reverse-time Wiener process. Therefore, once the score, $\nabla_\mathbf{z} \log p_\tau(\mathbf{z})$ is known, the noising process can be approximately reversed, facilitating sampling of the learned image distribution.
+
+The choices of $\mathbf{f}$ and $g$ in \eqref{eq:general_sde} define different families of SDEs. Variance-preserving models are the continuous-time analogue of the DDPM construction above. They may be written as
+
+\begin{equation}
+d\mathbf{z}=-\frac{1}{2}\beta(\tau)\mathbf{z}\,d\tau+\sqrt{\beta(\tau)}\,d\mathbf{w},
+\label{eq:vp_sde}
+\end{equation}
+
+where $\beta(\tau)$ is the continuous-time noise schedule - the continuous analogue of the discrete DDPM schedule $\beta_t$.
+
+In contrast, variance-exploding (VE) SDEs are parameterised directly by a noise scale $\sigma$, and add Gaussian noise with increasing variance, such that a noisy image at noise level $\sigma$ is given by
+
+\begin{equation}
+\mathbf{z}_\sigma=\mathbf{x}+\sigma\boldsymbol{\epsilon}, \qquad \boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I}),
+\label{eq:ve_noisy_image}
+\end{equation}
+
+so the marginal probability to use in the reverse-time process becomes
+
+\begin{equation}
+p_\sigma(\mathbf{z})=\int \mathcal{N}(\mathbf{z};\mathbf{x},\sigma^2\mathbf{I})p_{\mathrm{data}}(\mathbf{x})\,d\mathbf{x}.
+\label{eq:ve_marginal}
+\end{equation}
+
+We can then train a denoiser conditioned on this noise level, $D_{\boldsymbol{\phi}}(\mathbf{z}, \sigma)$ to recover clean images from their noisy versions using the loss,
+
+\begin{equation}
+\mathcal L_{\mathrm{VE}}(\boldsymbol{\phi})=
+\mathbb E_{\mathbf{x},\sigma,\boldsymbol{\epsilon}}
+\left[
+\lambda(\sigma)
+\left\|D_{\boldsymbol{\phi}}(\mathbf{x}+\sigma\boldsymbol{\epsilon},\sigma)-\mathbf{x}\right\|_2^2
+\right],
+\label{eq:ve_denoising_loss}
+\end{equation}
+
+where $\lambda(\sigma)$ is a weighting over noise scales which can be used to ensure losses at all scales contribute similarly. As the best predictor of a random variable under squared-error loss is its conditional expectation, this also implies that the optimal denoiser is such that
+
+\begin{equation}
+D^*(\mathbf{z},\sigma)=\mathbb E[\mathbf{x}\mid \mathbf{z}].
+\label{eq:optimal_denoiser_conditional_mean}
+\end{equation}
+
+Therefore, using Tweedie's formula gives
+
+\begin{align}
+\nabla_{\mathbf{z}}\log p_\sigma(\mathbf{z})&=
+\frac{\mathbb E[\mathbf{x}\mid \mathbf{z}]-\mathbf{z}}{\sigma^2}\\
+\implies \mathbf{s}_{\boldsymbol{\phi}}(\mathbf{z},\sigma)&=
+\frac{D_{\boldsymbol{\phi}}(\mathbf{z},\sigma)-\mathbf{z}}{\sigma^2},
+\label{eq:score_from_denoiser}
+\end{align}
+
+allowing denoising models to be used in both reverse-VE-SDE samplers and inverse-problem methods as a prior score.
 
 \subsection{The Suitability of Variance-Exploding Models for CT Imaging}
+\label{subsec:suitability_ve_ct}
+
+The VE diffusion approach is a natural fit for medical imaging inverse problems because the addition of Gaussian noise to form latent images preserves the units of the underlying images. This is in contrast with VP noising processes, which work by both attenuating the image and adding noise, as demonstrated for DDPM in \eqref{eq:ddpm_forward_process}. 
+
+We can therefore interpret a VP-denoised prediction, $D_{\boldsymbol{\phi}}(\mathbf{z},\sigma)$ as a clean-image estimate, enabling direct application of medical imaging measurement models, which are defined on the clean images. For example, in CT reconstruction, we can predict the corresponding sinogram as $AD_{\boldsymbol{\phi}}(\mathbf{z},\sigma)$, where $A$ is the CT forward operator \cite{SongMedicalInverse, ChungYeMRI, DPS}.
 
 \subsection{The PaDIS Approach}
+\label{subsec:padis_approach}
+
+Instead of learning to denoise complete images, PaDIS learns a diffusion prior from image patches, alongside their positional information. This aims to reduce both the memory and data requirements for training, with single images providing many training examples \cite{PaDIS}.
+
+Let $G_c$ be an operator which extracts a patch, $c$, of size $P$ from an image $\mathbf{x}$ of size $N$, along with the positional encoding for the patch, $\boldsymbol{\rho}_c$, before adding noise to only the image part. This positional encoding is formed by scaling the $x$ and $y$ coordinates of the image pixels and scaling them between $-1$ and $1$. A noisy patch can then be denoted as
+
+\begin{equation}
+G_c\mathbf{x}+\sigma\boldsymbol{\epsilon},
+\qquad
+\boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I}).
+\label{eq:noisy_patch}
+\end{equation}
+
+Using this, Hu et. al. define a patch denoising objective,
+
+\begin{equation}
+\mathcal L_{\mathrm{PaDIS}}(\boldsymbol{\phi})
+=
+\mathbb E_{\mathbf{x},c,\sigma,\boldsymbol{\epsilon}}
+\left[
+\left\|
+D_{\boldsymbol{\phi}}(G_c\mathbf{x}+\sigma\boldsymbol{\epsilon},\boldsymbol{\rho}_c,\sigma)
+-
+G_c\mathbf{x}
+\right\|_2^2
+\right],
+\label{eq:padis_denoising_objective}
+\end{equation}
+
+which according to \eqref{eq:score_from_denoiser} gives the patch score,
+
+\begin{equation}
+\mathbf{s}_{\boldsymbol{\phi},c}(G_c\mathbf{z},\boldsymbol{\rho}_c,\sigma)
+=
+\frac{
+D_{\boldsymbol{\phi}}(G_c\mathbf{z},\boldsymbol{\rho}_c,\sigma)
+-
+G_c\mathbf{z}
+}{\sigma^2}.
+\label{eq:padis_patch_score}
+\end{equation}
+
+Where $k=\left\lfloor N/P \right\rfloor$, an $N\times N$ image could be covered by a $(k+1)\times(k+1)$ grid of non-overlapping $P\times P$ patches after padding. Naively fixing this patch partition and combining the corresponding patch scores would enable construction of a whole-image score, but would cause visible patch boundaries because the patch boundaries remain fixed throughout sampling. To mitigate this, PaDIS zero-pads each image on all sides by
+
+\begin{equation}
+M=(k+1)P-N,
+\label{eq:padis_padding}
+\end{equation}
+
+giving a padded image of size $(N+2M)\times(N+2M)$. It then considers many different non-overlapping patch partitions, indexed by shifts
+
+\begin{equation}
+(i,j)\in\{1,\dots,M\}^2.
+\label{eq:padis_shifts}
+\end{equation}
+
+Each choice of $(i,j)$ also implicitly defines the remaining outer border region from zero-padding. This adds flexibility to the model, allowing us to sample from different shifts during reconstruction to reduce the fixed boundary artefacts.
+
+Using the above, the full-image distribution at noise level $\sigma$ can be modelled as
+
+\begin{equation}
+p_\sigma(\mathbf{z})
+=
+\frac{1}{Z_\sigma}
+\prod_{i,j}
+p_{\sigma,i,j,B}(\mathbf{z}_{i,j,B})
+\prod_{r=1}^{(k+1)^2}
+p_{\sigma,i,j,r}(\mathbf{z}_{i,j,r}),
+\label{eq:padis_full_image_distribution}
+\end{equation}
+
+where $\mathbf{z}_{i,j,r}$ denotes the $r$th patch under shift $(i,j)$, $\mathbf{z}_{i,j,B}$ denotes the bordering zero-padded region, and $Z_\sigma$ is a normalising constant. Differentiating the logarithm of this distribution then gives the whole-image score as a sum of patch scores;
+
+\begin{equation}
+\nabla_{\mathbf{z}}\log p_\sigma(\mathbf{z})
+=
+\sum_{i,j}
+\left(
+\mathbf{s}_{\sigma,i,j,B}(\mathbf{z}_{i,j,B})
++
+\sum_{r=1}^{(k+1)^2}
+\mathbf{s}_{\sigma,i,j,r}(\mathbf{z}_{i,j,r})
+\right).
+\label{eq:padis_whole_image_score_sum}
+\end{equation}
+
+The border term is zero by construction, and the patch terms are learned by the denoising network. Computing this over all possible partitions at each sampling step would be prohibitively expensive, so sampling and reconstruction instead select one random shift at each iteration, and use this to estimate the whole-image score. For a selected shift $(i,j)$, this gives the PaDIS score estimate
+
+\begin{equation}
+\mathbf{s}_{\mathrm{PaDIS}}(\mathbf{z},\sigma)
+\approx
+\sum_{r=1}^{(k+1)^2}
+G_{i,j,r}^T
+\mathbf{s}_{\boldsymbol{\phi},i,j,r}
+(G_{i,j,r}\mathbf{z},\boldsymbol{\rho}_{i,j,r},\sigma),
+\label{eq:padis_score_estimate}
+\end{equation}
+
+where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. The PaDIS paper found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions.
 
 \section{Reconstruction Methods}
+\label{sec:reconstruction_methods}
 
 \subsection{Filtered Back-Projection and the FDK Method}
+\label{subsec:fbp_fdk}
+
+Within the parallel-beam regime, filtered back-projection (FBP) can be used as a direct reconstruction method. It works by converting the measured sinogram into radial slices of the Fourier domain representation of $f(x,y)$ using the Fourier slice theorem. To convert this into the image domain, we perform an inverse Fourier transform. However, to prevent a need for interpolation, we perform this transform in polar coordinates, introducing a Jacobian factor $|\omega|$. This factor acts as a ramp \cite{ramp} filter, and corrects the over-representation of low-frequencies which would otherwise dominate the signal. This gives frequency-weighted projections, 
+
+\begin{equation}
+Q_\theta(t)
+=
+\int_{-\infty}^{\infty}
+S_\theta(\omega)|\omega|e^{2\pi i\omega t}\,d\omega.
+\label{eq:filtered_projection}
+\end{equation}
+
+This gives the desired image, but in the detector coordinate system $(\theta, t)$. To recover the $(x,y)$-space image, we back-project into the image domain using
+
+\begin{equation}
+\hat f(x,y)
+=
+\int_0^\pi
+Q_\theta(x\cos\theta+y\sin\theta)\,d\theta,
+\label{eq:fbp_continuous}
+\end{equation}
+
+or with a finite number of views, 
+
+\begin{equation}
+\hat f(x,y)
+\approx
+\frac{\pi}{N_\theta}
+\sum_{i=1}^{N_\theta}
+Q_{\theta_i}(x\cos\theta_i+y\sin\theta_i).
+\label{eq:fbp_discrete}
+\end{equation}
+
+This method is fast and interpretable, but requires dense angular sampling to achieve good reconstructions.
+
+These same ideas can be extended to realistic fan-beam and cone-beam geometries. These methods still filter projection data and back-project into the image domain, but must also account for the divergent ray geometries. In circular cone-beam CT, this leads to the Feldkamp-Davis-Kress (FDK) algorithm, which is typically used in industry to approximate circular cone-beam reconstructions \cite{}.
 
 \subsection{Iterative Reconstruction and Denoising Priors}
+\label{subsec:iterative_reconstruction_denoising_priors}
+
+Instead of trying to perform reconstruction in one analytical operation, iterative reconstructions treat reconstruction as a data-fitting problem, repeatedly updating an initial image estimate to make its forward projection better match the measured sinogram. For a forward model
+
+\begin{equation}
+\mathbf{y}=A\mathbf{x}+\boldsymbol{\eta},
+\label{eq:iterative_forward_model}
+\end{equation}
+
+this often involves minimising the squared residual,
+
+\begin{equation}
+\mathcal{L}_{\mathbf{y}}(\mathbf{x})
+=
+\frac{1}{2}
+\|\mathbf{y}-A\mathbf{x}\|_2^2,
+\label{eq:data_loss}
+\end{equation}
+
+The gradient of this loss is
+
+\begin{equation}
+\nabla_{\mathbf{x}}\mathcal{L}_{\mathbf{y}}(\mathbf{x})
+=
+A^T(A\mathbf{x}-\mathbf{y}),
+\label{eq:data_loss_gradient}
+\end{equation}
+
+enabling data-consistency updates of the form
+
+\begin{equation}
+\mathbf{x}^{k+1}
+=
+\mathbf{x}^k
+-
+\delta_{\mathrm{data}}
+A^T(A\mathbf{x}^k-\mathbf{y}),
+\label{eq:data_consistency_update}
+\end{equation}
+
+which locally reduce the projection mismatch. The scaling of the update step, $\delta_\text{data}$, however, cannot be chosen independently of the forward operator because the scale of $A$ depends on the reconstruction geometry and image normalisation. To account for this, we can use the operator Hessian to find the residual curvature,
+
+\begin{equation}
+\kappa=\nabla_{\mathbf{x}}^2\mathcal{L}_{\mathbf{y}}(\mathbf{x})
+=
+A^TA,
+\label{eq:data_loss_hessian}
+\end{equation}
+
+meaning that for the pure quadratic loss term, we can produce stable updates in all directions by taking
+
+\begin{equation}
+0<\delta_{\mathrm{data}}<\frac{2}{\|A^TA\|_2},
+\label{eq:data_step_stability}
+\end{equation}
+
+where 
+
+\begin{equation}
+\|A^TA\|_2
+=
+\max_{\Delta\mathbf{x}\neq 0}
+\frac{
+\|A^TA\Delta\mathbf{x}\|_2
+}{
+\|\Delta\mathbf{x}\|_2
+}.
+\label{eq:operator_norm_definition}
+\end{equation}
+
+Observing that $A^TA$ is symmetric and positive semi-definite then allows us to set 
+
+\begin{equation}
+\|A^TA\|_2
+=
+\lambda_{\max}(A^TA)
+=
+\|A\|_2^2,
+\label{eq:operator_norm_relation}
+\end{equation}
+
+so a more stable version of the update is
+
+\begin{equation}
+\mathbf{x}^{k+1}
+=
+\mathbf{x}^k
+-
+\frac{\zeta}{\|A\|_2^2}
+A^T(A\mathbf{x}^k-\mathbf{y}),
+\label{eq:scaled_data_consistency_update}
+\end{equation}
+
+with $0<\zeta<2$ giving stability. Although this does not guarantee convergence once additional priors, denoisers or sampling steps are introduced, it does give the measurement-gradient part of the update the correct scale. This scaling is particularly important in CT because $\|A\|_2$ depends on the projection geometry, detector spacing, number of views, image resolution and measurement units. Therefore, without it, a specific data-consistency coefficient loses meaning across different setups.
+
+This squared error term alone is normally insufficient In sparse-view CT, because many images provide approximately correct measurement projections. Iterative reconstruction is therefore often combined with other regularising terms, $R(\mathbf{x})$ such that 
+
+\begin{equation}
+\hat{\mathbf{x}}
+=
+\arg\min_{\mathbf{x}}
+\frac{1}{2}
+\|\mathbf{y}-A\mathbf{x}\|_2^2
++
+\lambda R(\mathbf{x}).
+\label{eq:regularised_reconstruction_objective}
+\end{equation}
+
+Often, a total-variation regulariser is used, where
+
+\begin{equation}
+R(\mathbf{x})=\mathrm{TV}(\mathbf{x})
+=
+\sum_i
+\sqrt{
+(D_x\mathbf{x})_i^2
++
+(D_y\mathbf{x})_i^2
++
+\epsilon^2
+},
+\label{eq:total_variation_regulariser}
+\end{equation}
+
+favouring piecewise smooth images whilst still allowing share edges, approximately matching the expected form for CT images. 
+
+Instead of these explicit regularisers, Plug-and-play methods utilise a learned denoising step and alternate between data-consistence and denoising updates, often with
+
+\begin{equation}
+\tilde{\mathbf{x}}^{k+1}
+=
+\mathbf{x}^k
+-
+\delta_{\mathrm{data}}A^T(A\mathbf{x}^k-\mathbf{y}),
+\label{eq:pnp_data_update}
+\end{equation}
+
+followed by 
+
+\begin{equation}
+\mathbf{x}^{k+1}
+=
+D_\sigma(\tilde{\mathbf{x}}^{k+1}),
+\label{eq:pnp_denoising_update}
+\end{equation}
+
+where $D_\sigma$ has been trained to remove noise at scale $\sigma$. This allows the data-consistency step to keep reconstructions near the measured sinogram, whilst the denoising step directs updates towards the distribution of clean training images.
 
 \subsection{Diffusion Models for Inverse Problems}
+\label{subsec:diffusion_models_inverse_problems}
+
+As discussed in Section \ref{sec:score_based_sdes}, we can use a variance exploding denoiser to estimate the score. At a fixed noise level, $\sigma_k$, this can be used to inform a Langevin update to an existing reconstruction $\tilde{\mathbf{z}}^k$ as 
+
+\begin{equation}
+\mathbf{z}^{k+1}
+=
+\tilde{\mathbf{z}}^k
++
+\frac{\alpha_k}{2}
+\mathbf{s}_{\boldsymbol{\phi}}(\tilde{\mathbf{z}}^k,\sigma_k)
++
+\sqrt{\alpha_k}\boldsymbol{\xi}^k,
+\qquad
+\boldsymbol{\xi}^k\sim\mathcal{N}(\mathbf{0},\mathbf{I}).
+\label{eq:Langevin_step}
+\end{equation}
+
+Here, the score term moves the reconstruction towards regions of higher probability under the learned image prior, while the stochastic term maintains sampling diversity.
+
+To move effectively perform reconstruction, we can combine this prior update with a data consistency update by inserting a gradient step against the measurement residual,
+
+\begin{equation}
+\tilde{\mathbf{z}}^{k+1}
+=
+\mathbf{z}^k
++
+\delta_{\mathrm{data}}
+A^T(\mathbf{y}-A\mathbf{z}^k),
+\label{eq:langevin_data_update}
+\end{equation}
+
+followed by at least one Langevin prior step from \eqref{eq:Langevin_step}. Here, the data step guides the image towards consistency with the measured sinogram, and the Langevin step pulls it towards the learned image prior. We will refer to this as the Langevin reconstruction method throughout.
+
+Diffusion posterior sampling (DPS) instead applies the sinogram measurement model to the denoised estimate, such that if we define the clean image as
+
+\begin{equation}
+\hat{\mathbf{x}}_0^k
+=
+D_{\boldsymbol{\phi}}(\mathbf{z}^k,\sigma_k),
+\label{eq:dps_clean_estimate}
+\end{equation}
+
+then we can construct a data consistency update with
+
+\begin{equation}
+\tilde{\mathbf{z}}^{k+1}
+=
+\mathbf{z}^k
+-
+\frac{\zeta_k}{2}
+\nabla_{\mathbf{z}^k}
+\|\mathbf{y}-A\hat{\mathbf{x}}_0^k\|_2^2,
+\label{eq:dps_data_update}
+\end{equation}
+
+which can then again be followed by at least one Langevin prior step as in \eqref{eq:Langevin_step}. This will be referred to as either the DPS-Langevin, or the PaDIS sampling method throughout.
+
+By discretising the reverse-time SDE \eqref{eq:reverse_time_sde}, we can derive an alternative prediction step moving from the defined noise level $\sigma_k$ to $\sigma_{k+1}$ as
+
+\begin{equation}
+\tilde{\mathbf{z}}^{k+1}
+=
+\mathbf{z}^k
++
+(\sigma_{k+1}^2-\sigma_k^2)
+\mathbf{s}_{\boldsymbol{\phi}}(\mathbf{z}^k,\sigma_k)
++
+\sqrt{\sigma_{k+1}^2-\sigma_k^2}\boldsymbol{\xi}^k,
+\label{eq:pc_predictor_step}
+\end{equation}
+
+which we can then again correct towards the regions of higher probability under the learned image prior using the same Langevin step from \eqref{eq:Langevin_step}. This is known as the predictor-corrector (PC) method.
+
+Instead of descending the square residual, DDNM methods impose measurement consistency through an approximate pseudoinverse of the form
+
+\begin{equation}
+\hat{\mathbf{x}}_{\mathbf{y}}^k
+=
+A^\dagger\mathbf{y}
++
+(I-A^\dagger A)\hat{\mathbf{x}}_0^k.
+\label{eq:ddnm_measurement_consistency}
+\end{equation}
+
+Here, the first term gives the component determined by the sinogram, and the second acts to preserve the component of the denoised estimate lying approximately within the null space of the forward model. Within the VE implementation, this can also be converted back to a score estimate via
+
+\begin{equation}
+\mathbf{s}_{\mathrm{DDNM}}(\mathbf{z}^k,\sigma_k)
+=
+\frac{
+\hat{\mathbf{x}}_{\mathbf{y}}^k-\mathbf{z}^k
+}{\sigma_k^2}.
+\label{eq:ddnm_score_estimate}
+\end{equation}
+
+The reconstruction is then, again updated at least once using the Langevin step from \eqref{eq:Langevin_step}, where $\mathbf{s}_{\boldsymbol{\phi}}(\tilde{\mathbf{z}}^k,\sigma_k)=\mathbf{s}_{\mathrm{DDNM}}(\mathbf{z}^k,\sigma_k)$.
