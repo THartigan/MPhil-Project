@@ -12,7 +12,7 @@ Quantitative tables show $\mathrm{mean}^{+u}_{-l}$ with asymmetric 95\% bootstra
 
 \section{Reconstruction Quality}
 
-The main results are shown in \autoref{tab:main-quality}. At 20 views, LION-physics PaDIS with VE-DDNM achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion under the same sampler. Operator-normalised LION-physics DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the paper-style and public-compatible DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied thoracic and abdominal slices rather than one favourable example.
+The main results are shown in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-physics PaDIS VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-physics DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the paper-style and public-compatible DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example.
 
 \begin{center}
 \centering
@@ -136,7 +136,7 @@ This dependence on sampler persisted across geometries (\autoref{tab:extra-quali
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figure8_512_ct.pdf}
-\caption[Native-resolution reconstruction.]{Native $512\times512$ reconstruction from 60 fan-beam views, displayed in HU. PaDIS restores substantially more anatomical detail than FDK or CP and closely matches the held-out target.}
+\caption[Native-resolution reconstruction.]{Native $512\times512$ reconstruction from 60 fan-beam views, displayed in HU. In this example, PaDIS restores more anatomical detail than FDK or CP.}
 \label{fig:results-512-ct}
 \end{figure}
 
@@ -144,7 +144,7 @@ This dependence on sampler persisted across geometries (\autoref{tab:extra-quali
 
 \subsection{Patch Size}
 
-The patch-size study in \autoref{tab:patch-size} did not show a simple small-patch advantage. The $96\times96$ model achieved $34.26\,\mathrm{dB}$, statistically indistinguishable from the $34.25\,\mathrm{dB}$ whole-image result, whereas $32\times32$ patches performed worst. Very small $8\times8$ patches recovered much of the lost performance, so patch area alone cannot explain the non-monotonic trend. The extended visual comparison in \autoref{fig:results-patch-size} shows that the larger patches most consistently preserve fine anatomy.
+The patch-size study in \autoref{tab:patch-size} did not show a simple small-patch advantage. The $96\times96$ model achieved $34.26\,\mathrm{dB}$, almost identical in mean PSNR to the $34.25\,\mathrm{dB}$ whole-image result, whereas $32\times32$ patches performed worst. Very small $8\times8$ patches recovered much of the lost performance, so patch area alone cannot explain the non-monotonic trend. The extended visual comparison in \autoref{fig:results-patch-size} suggests that the larger patches preserve fine anatomy more consistently. As the non-default patch models inherited the $P=56$ reconstruction setting rather than being tuned separately, these rows should not be interpreted as model-specific optima.
 
 \begin{table}[htbp]
 \centering
@@ -219,7 +219,7 @@ Training on all processed slices slightly improved the whole-image LION-physics 
 
 \subsection{Position, Initialisation and Schedule}
 
-Removing positional channels or replacing FDK initialisation with Gaussian noise changed LION-physics PSNR by at most $0.10\,\mathrm{dB}$ within matched geometric-schedule rows (\autoref{tab:position}). The reconstructions in \autoref{fig:results-position-encoding} are likewise visually similar. Position was therefore not necessary once CT measurements supplied global structure, although this experiment does not test position-free unconditional generation. In contrast, replacing the geometric schedule with the public repository's EDM-style default reduced the position-enabled LION-physics result from $32.82$ to $31.53\,\mathrm{dB}$ with FDK initialisation.
+Replacing FDK initialisation with Gaussian noise changed LION-physics PSNR by at most $0.10\,\mathrm{dB}$ within matched geometric-schedule rows (\autoref{tab:position}), while removing positional channels reduced PSNR by $0.30\,\mathrm{dB}$ from FDK and $0.40\,\mathrm{dB}$ from noise. The reconstructions in \autoref{fig:results-position-encoding} are nevertheless visually similar. Positional channels therefore gave only a small improvement in these measurement-conditioned reconstructions, although the no-position model inherited the default model's inference setting and this experiment does not test position-free unconditional generation. In contrast, replacing the geometric schedule with the public repository's EDM-style default reduced the position-enabled LION-physics result from $32.82$ to $31.53\,\mathrm{dB}$ with FDK initialisation.
 
 \begin{figure}[htbp]
 \centering
@@ -261,7 +261,7 @@ Removing positional channels or replacing FDK initialisation with Gaussian noise
 
 \subsection{Sampler Dependence}
 
-Sampler choice changed the ranking of the learned priors. For LION-physics at 20 views, VE-DDNM favoured PaDIS by $2.30\,\mathrm{dB}$, whilst VE-DPS and Langevin favoured the whole-image prior by $1.43$ and $1.64\,\mathrm{dB}$ respectively (\autoref{tab:main-quality}). Predictor-corrector gave similar PSNR for both priors but substantially higher SSIM for PaDIS. \autoref{fig:results-sampling-methods} shows that each method produced plausible low-frequency anatomy on the selected slice, even where quantitative performance differed. This shows that PaDIS performance depends strongly on how its patch score is used during reconstruction.
+Sampler choice changed the ranking of the learned priors. Under their validation-selected LION-physics settings at 20 views, VE-DDNM favoured PaDIS by $2.30\,\mathrm{dB}$, whilst VE-DPS and Langevin favoured the whole-image prior by $1.43$ and $1.64\,\mathrm{dB}$ respectively (\autoref{tab:main-quality}). Predictor-corrector gave similar PSNR for both priors but substantially higher SSIM for PaDIS. \autoref{fig:results-sampling-methods} shows that each method produced plausible low-frequency anatomy on the selected slice, even where quantitative performance differed. As settings were selected per prior and sampler, these comparisons show the best observed configurations rather than isolating the patch score alone.
 
 \begin{figure}[htbp]
 \centering
@@ -272,11 +272,11 @@ Sampler choice changed the ranking of the learned priors. For LION-physics at 20
 
 \section{Runtime and Unconditional Generation}
 
-PaDIS-DPS required approximately two minutes per slice, $24\%$ less than whole-image VE-DPS, while fixed patch averaging and stitching required about $24$ minutes (\autoref{tab:runtime}). In unconditional generation (\autoref{fig:results-generation}), PaDIS and whole-image sampling produced the most coherent axial anatomy. Fixed stitching introduced discontinuities and anatomically implausible combinations, while averaging softened boundaries but did not restore global consistency.
+The pipeline logs recorded approximately two minutes per slice for PaDIS-DPS, $24\%$ less than whole-image VE-DPS, while fixed patch averaging and stitching recorded about $24$ minutes (\autoref{tab:runtime}). These jobs could run concurrently and were not isolated timing benchmarks. Among the four untuned samples per method in \autoref{fig:results-generation}, random PaDIS partitions avoided the rectangular discontinuities visible under fixed stitching, although this small sample is insufficient to rank distributional quality.
 
 \begin{table}[htbp]
 \centering
-\caption[Mean reconstruction time per slice.]{Mean time per slice.}\label{tab:runtime}
+\caption[Logged reconstruction time per slice.]{Mean 20-view wall time per slice parsed from the pipeline logs. Jobs could share a GPU, so these values are not isolated serial benchmarks.}\label{tab:runtime}
 \small
 \begin{tabular}{llr}
 \toprule[1.1pt]
@@ -313,6 +313,6 @@ PaDIS-DPS required approximately two minutes per slice, $24\%$ less than whole-i
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figure4_generation.pdf}
-\caption[Unconditional generation comparison.]{Unconditional samples from whole-image, fixed patch-stitching, fixed patch-averaging and PaDIS priors, shown in NI. Columns are independent samples. PaDIS preserves global axial anatomy while avoiding the discontinuities visible under fixed stitching.}
+\caption[Unconditional generation comparison.]{Unconditional samples from whole-image, fixed patch-stitching, fixed patch-averaging and PaDIS priors, shown in NI. Columns are independent samples. Random PaDIS partitions avoid the fixed rectangular discontinuities visible under stitching in these examples.}
 \label{fig:results-generation}
 \end{figure}

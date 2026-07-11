@@ -14,7 +14,14 @@
 \renewcommand*{\figureautorefname}{Figure}
 \renewcommand*{\tableautorefname}{Table}
 \renewcommand*{\equationautorefname}{Equation}
-\hypersetup{linktoc=all}
+\hypersetup{
+  linktoc=all,
+  pdfstartview=Fit,
+  pdftitle={Patch-Based Diffusion Models for Solving Inverse Problems in Computed Tomography Imaging -- Executive Summary},
+  pdfauthor={Thomas Hartigan},
+  pdfsubject={Data Intensive Science},
+  pdfkeywords={computed tomography, diffusion models, PaDIS, reproducibility, inverse problems}
+}
 
 \let\filledcite\cite
 \renewcommand{\cite}[1]{%
@@ -38,7 +45,7 @@
 
 \begin{center}
 \includegraphics[width=14mm]{Figs/University_Crest.pdf}\\[0.35em]
-{\LARGE\bfseries Patch-Based Diffusion Models for Solving\\[0.15em]Inverse Problems in Computed Tomography}\\[0.45em]
+{\LARGE\bfseries Patch-Based Diffusion Models for Solving\\[0.15em]Inverse Problems in Computed Tomography Imaging}\\[0.45em]
 {\large Executive Summary}\\[0.3em]
 {\normalsize Thomas Hartigan \enspace $\vert$ \enspace MPhil in Data Intensive Science}\\[0.45em]
 \rule{\textwidth}{0.6pt}
@@ -46,19 +53,19 @@
 
 \section{Purpose and Motivation}
 
-Computed tomography (CT) reconstructs internal anatomy from X-ray measurements acquired around a patient \cite{}. Using fewer projection angles can reduce acquisition time and radiation exposure, but leaves reconstruction severely underdetermined. Many images can explain the same sparse measurements. Classical methods therefore produce streaking or blur unless they are supported by a strong prior describing plausible anatomy.
+Computed tomography (CT) reconstructs anatomy from X-ray measurements \cite{}. Fewer projection angles can reduce acquisition time and radiation exposure, but leave reconstruction underdetermined because many images explain sparse measurements. Classical methods therefore produce streaking or blur without a prior for plausible anatomy.
 
-Diffusion models provide expressive learned priors, although conventional models operate on complete images and can require large datasets, long training times and GPU memory \cite{}. Hu et al. proposed the Patch Diffusion Inverse Solver (PaDIS) as an alternative \cite{}. PaDIS trains on small, position-labelled patches and repeatedly changes their partition during reconstruction, combining local scores into a whole-image update intended to remove seams. The original paper reported that PaDIS consistently outperformed a comparable whole-image diffusion model on sparse-view CT.
+Diffusion models provide expressive learned priors, although whole-image models can require extensive data, training and GPU memory \cite{}. Hu et al. proposed the Patch Diffusion Inverse Solver (PaDIS) as an alternative \cite{}. PaDIS trains on position-labelled patches and repeatedly changes their partition during reconstruction, combining local scores into a whole-image update intended to remove seams. The original paper reported that PaDIS consistently outperformed a comparable whole-image diffusion model on sparse-view CT.
 
-This project tested whether that result is reproducible and whether it transfers to a different public dataset and a fully specified fan-beam geometry. It also examined which parts of the method drive performance. Testing the claim independently matters because results governed by hidden implementation choices are difficult to validate or build upon. This is therefore a controlled reproduction and extension, rather than a numerical rerun.
+This project tested whether that result reproduces on a public dataset with a specified fan-beam geometry, and which choices drive performance. Independent testing matters because hidden implementation choices make results difficult to validate or build upon, making this a reproduction and extension rather than a numerical rerun.
 
 \section{Approach}
 
-The training, tuning and evaluation pipeline was reimplemented within the LION CT research framework \cite{} rather than treating the released code as executable ground truth. Experiments used LIDC-IDRI chest CT slices \cite{} with patient-level separation between training, validation and test sets. The default training subset contained at most four slices per patient, while an ablation used every processed slice. Measurements were simulated with a two-dimensional fan-beam operator whose field of view, detector, source distances and angular coverage were explicitly defined. No measurement noise was added, isolating angular undersampling from photon-count effects.
+We reimplemented training, tuning and evaluation within LION \cite{} rather than treating the released code as executable ground truth. Experiments used LIDC-IDRI slices \cite{} with patient-separated training, validation and test sets. The default subset contained at most four slices per patient, while an ablation used every processed slice. A fully defined two-dimensional fan-beam operator simulated noise-free measurements, isolating angular undersampling from photon-count effects.
 
-Three tracks captured different interpretations of the source material. The paper-style track followed published equations and sampling choices \cite{}. The public-compatible track followed the released repository \cite{}. On matched inputs, it reproduced an adapted fork's outputs within sampler variation. The LION-physics extension used the same priors but normalised data-consistency gradients using the squared norm of the composed CT operator, avoiding geometry-specific calibration constants. This separation was necessary because the paper and code differ in algorithmic choices.
+Because the paper and code differ in algorithmic choices, we used three tracks to capture different interpretations of the source material. The paper-style track followed the published equations and sampling choices \cite{}, while the public-compatible track followed the released repository and reproduced an adapted fork's outputs within sampler variation on matched inputs \cite{}. The LION-physics extension used the same priors but normalised data-consistency gradients using the squared norm of the composed CT operator, avoiding geometry-specific calibration constants.
 
-The evaluation compared classical reconstruction, whole-image diffusion and PaDIS samplers. Main tests used 8 and 20 views over a full rotation, with extensions to 60 views, limited-angle scanning and native $512\times512$ resolution. Ablations varied patch size, training-set size, positional encoding, initialisation and noise schedule. Results used PSNR, SSIM, MAE, measurement residuals and image-level bootstrap intervals.
+The evaluation compared classical, whole-image diffusion and PaDIS reconstruction. Main tests used 8 and 20 full-angle views, with extensions to 60 views, limited angles and native $512\times512$ resolution. Ablations varied patch size, training-set size, positional encoding, initialisation and noise schedule. Results used PSNR, SSIM, MAE, measurement residuals and image-level bootstrap intervals.
 
 \begin{figure}[htbp]
 \centering
@@ -69,7 +76,7 @@ The evaluation compared classical reconstruction, whole-image diffusion and PaDI
 
 \section{Principal Findings}
 
-\autoref{fig:exec-ct} clearly illustrates PaDIS's high-quality fan-beam reconstruction. At native $512\times512$ resolution (\autoref{fig:exec-native}), LION-physics PaDIS achieved $40.08$ dB PSNR and $0.960$ SSIM, exceeding FDK and CP-TV without requiring a whole-image model at that resolution. PaDIS paired with VE-DDNM produced the best 20-view and 60-view PSNR values in the study, reaching $36.49$ and $41.55$ dB respectively. The operator-normalised implementations also reduced relative sinogram residuals to approximately $10^{-3}$, showing that visually plausible outputs remained tied to the measurements.
+\autoref{fig:exec-ct} shows representative fan-beam reconstructions from PaDIS and the comparison methods. On the exploratory four-image native $512\times512$ subset (\autoref{fig:exec-native}), LION-physics PaDIS achieved $40.08$ dB PSNR and $0.960$ SSIM, exceeding FDK and CP-TV without requiring a whole-image model at that resolution. The separately tuned PaDIS VE-DDNM configuration produced the best 20-view and 60-view PSNR values in the study, reaching $36.49$ and $41.55$ dB respectively, while the operator-normalised VE-DPS rows reduced relative sinogram residuals to approximately $10^{-3}$ and therefore kept the outputs closely tied to the measurements.
 
 \begin{figure}[htbp]
 \centering
@@ -78,19 +85,19 @@ The evaluation compared classical reconstruction, whole-image diffusion and PaDI
 \label{fig:exec-native}
 \end{figure}
 
-The stronger claim of consistent PaDIS superiority was not reproduced. Under the VE-DPS comparison, the whole-image model achieved $34.25$ dB at 20 views and $29.58$ dB at 8 views, compared with $32.82$ and $27.65$ dB for PaDIS. The paper-style track showed the same reversal. PaDIS became superior only with particular samplers in this study, notably VE-DDNM. Patch training is therefore viable and sometimes advantageous, but the result depends on the interaction between prior, sampler and forward-operator scaling.
+The stronger claim of consistent PaDIS superiority was not reproduced. Under the VE-DPS comparison, the whole-image model achieved $34.25$ dB at 20 views and $29.58$ dB at 8 views, compared with $32.82$ and $27.65$ dB for PaDIS, and the paper-style track showed the same reversal. PaDIS exceeded the whole-image result only for some separately selected sampler configurations, notably VE-DDNM, so these comparisons do not isolate the prior alone. Patch training is therefore viable and sometimes advantageous, but the result depends on the interaction between prior, sampler and forward-operator scaling.
 
-The ablations changed the interpretation further. A $96\times96$ patch model matched the whole-image model within uncertainty, while intermediate smaller patches performed worse, indicating that global context remained valuable. Positional channels had almost no effect on measurement-conditioned reconstruction, in contrast to the original paper's reported failure without them. FDK and Gaussian initialisation also converged to similar final quality, whereas the geometric noise schedule improved PSNR by about $1.3$ dB over the released code's EDM-style default. Using all available training slices did not improve PaDIS under a fixed training-time budget. This comparison is confounded by the lower number of effective epochs and is not evidence that additional data are intrinsically unhelpful.
+The ablations changed the interpretation further. A $96\times96$ patch model had almost the same mean PSNR as the whole-image model, while intermediate smaller patches performed worse, suggesting that global context remained valuable. However, the non-default patch and no-position models inherited the default PaDIS inference setting and were not individually optimised. Positional channels improved measurement-conditioned PSNR by only $0.3$ to $0.4$ dB, in contrast to the original paper's reported failure without them, and FDK and Gaussian initialisation converged to similar final quality. The geometric noise schedule instead improved PSNR by about $1.3$ dB over the released code's EDM-style default. Using all available training slices did not improve PaDIS under a fixed training-time budget, although fewer effective epochs mean this is not evidence that additional data are intrinsically unhelpful.
 
-\autoref{fig:exec-generation} shows that random PaDIS partitions avoided boundaries created by fixed patch stitching and generated more coherent anatomy than patch assembly. PaDIS also reconstructed a slice in roughly two minutes, compared with about 2.6 minutes for whole-image VE-DPS and 24 minutes for fixed averaging or stitching.
+Among the four untuned samples per method in \autoref{fig:exec-generation}, random PaDIS partitions avoided the rectangular boundaries created by fixed patch stitching, although this small set cannot rank distributional quality. The pipeline recorded roughly two minutes per PaDIS slice, compared with about 2.6 minutes for whole-image VE-DPS and 24 minutes for fixed averaging or stitching, but concurrent jobs prevent an isolated speed comparison.
 
 \section{Reproducibility, Limitations and Implications}
 
 Exact reproduction from the original paper was not possible. Important architecture information was distributed inconsistently between references, appendix and code \cite{}. Training patch counts, validation and checkpoint selection, test slice identities, complete physical geometry, and the hyperparameter search protocol were not specified. The paper and released code form a combined but internally inconsistent specification, containing materially different algorithmic choices \cite{}. The three-track design made these differences explicit and showed that they can change scientific conclusions. The reversal of the central comparison is therefore an informative reproducibility result rather than a failed outcome.
 
-The results remain limited to one dataset, simulated two-dimensional measurements and a small test set. Noise-free sinograms omit photon noise, scatter, beam hardening and motion, so the work does not establish clinical low-dose performance. Some expensive experiments used only four images, confidence intervals do not include retraining variability, and no radiologist assessed lesion preservation or hallucination.
+The results remain limited to one dataset, simulated two-dimensional measurements and a small test set. Noise-free sinograms omit photon noise, scatter, beam hardening and motion, so the work does not establish clinical low-dose performance. Some expensive experiments used only four images, confidence intervals do not include retraining variability, and no radiologist assessed lesion preservation or hallucination. A larger native-resolution test set is therefore needed before drawing a population-level comparison between reconstruction methods.
 
-The practical conclusion is that PaDIS should be viewed as a memory-efficient route to high-resolution priors, not as a universally superior replacement for whole-image diffusion. Future work should use equal-compute and equal-epoch comparisons, multiple training seeds, calibrated measurement noise, external datasets and clinically relevant task assessment for safe clinical deployment. The project also demonstrates that inverse-problem papers should publish complete geometry, data splits, tuning procedures and code that matches the stated algorithms. Otherwise, apparent method improvements may instead reflect hidden implementation choices.
+The practical conclusion is that PaDIS should be viewed as a memory-scalable route to high-resolution priors, not as a universally superior replacement for whole-image diffusion. Future work should use equal-compute and equal-epoch comparisons, multiple training seeds, calibrated measurement noise, external datasets and clinically relevant task assessment for safe clinical deployment. The project also demonstrates that inverse-problem papers should publish complete geometry, data splits, tuning procedures and code that matches the stated algorithms. Otherwise, apparent method improvements may instead reflect hidden implementation choices.
 
 \begin{center}
 \centering

@@ -41,7 +41,7 @@ so log-transformed projections become noisy and biased at low counts. Like Hu et
 
 CT values are commonly displayed in Hounsfield units (HU) \cite{},
 \begin{equation}
-\mathrm{HU}=1000\frac{\mu-\mu_{\mathrm{water}}}{\mu_{\mathrm{water}}-\mu_{\mathrm{air}}},
+\mathrm{HU}=1000\frac{\mu-\mu_{\mathrm{water}}}{\mu_{\mathrm{water}}},
 \label{eq:hounsfield_units}
 \end{equation}
 for which water is approximately \(0\) HU and air \(-1000\) HU. The processed LIDC-IDRI images used here are normalised to \([0,1]\). Figures displayed in HU use the dataset mapping \(\mathrm{HU}=3000x-1000\).
@@ -326,7 +326,7 @@ M=(k+1)P-N,
 giving a padded image of size $(N+2M)\times(N+2M)$. It then considers many different non-overlapping patch partitions, indexed by shifts
 
 \begin{equation}
-(i,j)\in\{1,\dots,M\}^2.
+(i,j)\in\{0,\dots,M-1\}^2.
 \label{eq:padis_shifts}
 \end{equation}
 
@@ -360,7 +360,7 @@ where $\mathbf{z}_{i,j,r}$ denotes the $r$th patch under shift $(i,j)$, $\mathbf
 \label{eq:padis_whole_image_score_sum}
 \end{equation}
 
-The border term is zero by construction, and the patch terms are learned by the denoising network. Computing this over all possible partitions at each sampling step would be prohibitively expensive, so sampling and reconstruction instead select one random shift at each iteration, and use this to estimate the whole-image score. For a selected shift $(i,j)$, this gives the PaDIS score estimate
+The implementation fixes the padded border at zero and omits its score, while the patch terms are learned by the denoising network. Computing this over all possible partitions at each sampling step would be prohibitively expensive, so sampling and reconstruction instead select one random shift at each iteration and use a stochastic estimate of the whole-image score. For a selected shift $(i,j)$, this gives
 
 \begin{equation}
 \mathbf{s}_{\mathrm{PaDIS}}(\mathbf{z},\sigma)
@@ -502,8 +502,6 @@ R(\mathbf{x})=\mathrm{TV}(\mathbf{x})
 (D_x\mathbf{x})_i^2
 +
 (D_y\mathbf{x})_i^2
-+
-\epsilon^2
 },
 \label{eq:total_variation_regulariser}
 \end{equation}
@@ -512,27 +510,25 @@ favouring piecewise-smooth images while retaining sharp edges, approximately mat
 
 Chambolle--Pock (CP) solves the non-smooth isotropic TV objective with alternating primal and dual updates \cite{}. Its proximal steps handle TV directly and avoid ADMM's geometry-dependent linear solve, so the same formulation applies to different CT operators.
 
-Instead of these explicit regularisers, plug-and-play methods use a learned denoising step and alternate between data-consistency and denoising updates \cite{}, often with
+Instead of these explicit regularisers, plug-and-play methods use a learned denoiser within an iterative algorithm \cite{}. The PnP-ADMM method used here separates the data-fitting image, $\mathbf{x}$, denoised image, $\mathbf{v}$, and scaled dual variable, $\mathbf{u}$, with the data update
 
 \begin{equation}
-\tilde{\mathbf{x}}^{k+1}
+(A^TA+\eta I)\mathbf{x}^{k+1}
 =
-\mathbf{x}^k
--
-\delta_{\mathrm{data}}A^T(A\mathbf{x}^k-\mathbf{y}),
+A^T\mathbf{y}+\eta(\mathbf{v}^k-\mathbf{u}^k),
 \label{eq:pnp_data_update}
 \end{equation}
 
-followed by 
+followed by
 
 \begin{equation}
-\mathbf{x}^{k+1}
-=
-D_\sigma(\tilde{\mathbf{x}}^{k+1}),
+\mathbf{v}^{k+1}=D_\sigma(\mathbf{x}^{k+1}+\mathbf{u}^k),
+\qquad
+\mathbf{u}^{k+1}=\mathbf{u}^k+\mathbf{x}^{k+1}-\mathbf{v}^{k+1},
 \label{eq:pnp_denoising_update}
 \end{equation}
 
-where $D_\sigma$ has been trained to remove noise at scale $\sigma$. This allows the data-consistency step to keep reconstructions near the measured sinogram, whilst the denoising step directs updates towards the distribution of clean training images.
+where $D_\sigma$ removes noise at scale $\sigma$ and conjugate gradients approximately solve the linear system, alternating measurement agreement with a learned clean-image prior.
 
 \subsection{Diffusion Models for Inverse Problems}
 \label{subsec:diffusion_models_inverse_problems}
@@ -600,10 +596,10 @@ By discretising the reverse-time SDE \eqref{eq:reverse_time_sde}, we can derive 
 =
 \mathbf{z}^k
 +
-(\sigma_{k+1}^2-\sigma_k^2)
+(\sigma_k^2-\sigma_{k+1}^2)
 \mathbf{s}_{\boldsymbol{\phi}}(\mathbf{z}^k,\sigma_k)
 +
-\sqrt{\sigma_{k+1}^2-\sigma_k^2}\boldsymbol{\xi}^k,
+\sqrt{\sigma_k^2-\sigma_{k+1}^2}\boldsymbol{\xi}^k,
 \label{eq:pc_predictor_step}
 \end{equation}
 
