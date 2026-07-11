@@ -1,3 +1,125 @@
+# PaDIS-LION-Compat
+
+PaDIS-LION-Compat is a fork of the original
+[PaDIS repository](https://github.com/jasonhu4/PaDIS) by Hu et al. It integrates
+checkpoints trained by the main [LION](https://github.com/CambridgeCIA/LION)
+PaDIS implementation with the original PaDIS reconstruction code. Its purpose
+is compatibility testing: the same LION-trained PaDIS/NCSN++ prior can be run
+through Hu et al.'s public sampler, preprocessing, and CT reconstruction path
+for direct implementation comparisons.
+
+The original PaDIS project and paper remain the source of the method. The
+compatibility additions in this fork are concentrated in:
+
+- `lion_checkpoint.py`, which loads a LION `.pt` checkpoint (and its `.json`
+  sidecar when available) and exposes it through the denoiser interface expected
+  by the original PaDIS sampler;
+- `prepare_lidc_pngs.py`, which exports LIDC-IDRI slices using LION's split,
+  resizing, and HU normalisation; and
+- the extended `inverse_nodist.py`, which accepts LION checkpoints and provides
+  diagnostic sampler and LION-geometry options while retaining the original
+  README reconstruction path as the default.
+
+## Using PaDIS-LION-Compat with LION
+
+Install the main LION repository and this fork in sibling directories. Use a
+Python environment containing the dependencies from both LION and this fork;
+the repository's development setup uses the `padis-dev` Conda environment.
+The examples below assume this layout:
+
+```text
+project/
+├── LION/
+└── PaDIS_lion_recon/
+```
+
+LION checkpoints used by this fork should normally consist of the model file
+and its metadata sidecar in the same directory:
+
+```text
+padis_lidc_256.pt
+padis_lidc_256.json
+```
+
+The sidecar lets the adapter recover the trained image size, patch size,
+padding, channel count, model parameters, and geometry. If it is absent, the
+loader falls back to the LION PaDIS LIDC 256 defaults. EMA weights embedded in
+the checkpoint, or stored in a neighbouring `.ema.pt` file, are used when
+available.
+
+### 1. Export LIDC-IDRI images with LION preprocessing
+
+From `PaDIS_lion_recon`, convert a LION test split to the PNG input expected by
+the public PaDIS script:
+
+```bash
+conda run -n padis-dev env PYTHONPATH=../LION \
+  python prepare_lidc_pngs.py \
+  --lion-repo ../LION \
+  --split test \
+  --input-root /path/to/LION_DATA_PATH/processed/LIDC-IDRI \
+  --output-dir /path/to/LIDC-IDRI-padis-png-256 \
+  --image-size 256
+```
+
+This follows LION's `LIDC_IDRI(..., task="image_prior")` data path: HU slices
+are resized with bilinear interpolation (`align_corners=False`) and mapped to
+`[0, 1]` as `(HU + 1000) / 3000`, with clipping. Add `--limit 1` for a quick
+setup check. Match `--image-size` to the checkpoint (for example, use `512` for
+a 512 checkpoint).
+
+### 2. Reconstruct with a LION checkpoint
+
+Run the original PaDIS DPS reconstruction, replacing the example paths with
+the checkpoint produced by LION and the exported PNG directory:
+
+```bash
+conda run --no-capture-output -n padis-dev env PYTHONPATH=../LION \
+  MPLCONFIGDIR=/tmp/padis-mpl XDG_CACHE_HOME=/tmp/padis-xdg \
+  python inverse_nodist.py \
+  --network /path/to/padis_lidc_256.pt \
+  --lion_repo ../LION \
+  --device cuda \
+  --ct_impl astra_cuda \
+  --image_dir /path/to/LIDC-IDRI-padis-png-256 \
+  --outdir /path/to/results \
+  --name ct_parbeam \
+  --views 20 \
+  --steps 100 \
+  --sigma_min 0.003 \
+  --sigma_max 10 \
+  --zeta 0.3 \
+  --sigma 0 \
+  --max_images 1
+```
+
+`ct_parbeam` and the default `dps` sampler are the closest compatibility check
+against the command in the upstream README. Use `--name ct_lion_fanbeam` or
+`--name ct_lion_parbeam` when the comparison specifically requires LION-scale
+geometry. The fork also exposes `pc`, `langevin`, `ddnm`, `patch_average`, and
+`patch_stitch` through `--sampler` for diagnostics.
+
+On memory-constrained GPUs, add `--patch_batch_size 1`. DPS and the fixed-patch
+variants differentiate through the denoiser for data consistency; add
+`--checkpoint_denoiser` if they still exceed available memory. CPU execution is
+available with `--device cpu --ct_impl astra_cpu`, but is intended only for
+short setup checks.
+
+Each run writes reconstruction PNGs and `reconstructions.npz`, containing the
+clean images, reconstructions, PSNR, SSIM, and input filenames. See
+[`RUN_LION_LIDC.md`](./RUN_LION_LIDC.md) for the complete option reference,
+validated 256/512 examples, LION-geometry comparisons, tracing, and sampler
+diagnostics. For training checkpoints and running the full experiment matrix,
+use the PaDIS reproduction pipeline documented in the main LION repository at
+`scripts/paper_scripts/PaDIS-Reproduction/README.md`.
+
+---
+
+## Original PaDIS README
+
+The remainder of this file retains the original upstream project description
+and usage instructions.
+
 ## Learning Image Priors through Patch-based Diffusion Models for Solving Inverse Problems<br><sub>Official PyTorch implementation</sub>
 
 Our work has been accepted to [Neurips 2024](https://nips.cc/virtual/2024/poster/95843). 
