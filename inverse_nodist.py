@@ -148,18 +148,34 @@ def validate_stop_after_outer_steps(stop_after_outer_steps):
         raise ValueError('stop_after_outer_steps must be positive or None')
     return stop_after_outer_steps
 
+def make_sigma_steps(net, num_steps, sigma_min, sigma_max, rho, device, sigma_schedule='edm'):
+    if sigma_schedule == 'edm':
+        step_indices = torch.arange(num_steps, dtype=torch.float64, device=device)
+        t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
+    elif sigma_schedule == 'geometric':
+        t_steps = torch.exp(
+            torch.linspace(
+                np.log(sigma_max),
+                np.log(sigma_min),
+                num_steps,
+                dtype=torch.float64,
+                device=device,
+            )
+        )
+    else:
+        raise ValueError(f'Unknown sigma_schedule: {sigma_schedule}')
+    return torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+
 def pc_sampling(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.randn_like, num_steps=18,
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
               S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,
               intermediate_dir=None, intermediate_interval=5, stop_after_outer_steps=None,
-              patch_batch_size=None, trace_file=None, trace_interval=0,):
+              patch_batch_size=None, trace_file=None, trace_interval=0, sigma_schedule='edm'):
     w = len(latents[0,0,0,:])
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
     x_init = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
-    step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
-    t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
-    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+    t_steps = make_sigma_steps(net, num_steps, sigma_min, sigma_max, rho, latents.device, sigma_schedule)
 
     x_init = sigma_max * torch.randn_like(x_init)
     x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0)
@@ -302,14 +318,12 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
               S_churn=0, S_min=0, S_max=float('inf'), S_noise=1,
               intermediate_dir=None, intermediate_interval=5, data_gradient_scale=None,
               trace_file=None, trace_interval=0, stop_after_outer_steps=None,
-              patch_batch_size=None,):
+              patch_batch_size=None, checkpoint_denoiser=False, sigma_schedule='edm'):
     w = len(latents[0,0,0,:])
     patches = w // psize + 1
     spaced = np.linspace(0, (patches-1)*psize, patches, dtype=int)
     x_init = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
-    step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
-    t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
-    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+    t_steps = make_sigma_steps(net, num_steps, sigma_min, sigma_max, rho, latents.device, sigma_schedule)
 
     x = sigma_max * torch.randn_like(x_init)
     x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0).requires_grad_()
@@ -339,7 +353,19 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
         alpha = 0.5*t_cur**2
         for j in range(10):
             indices = getIndices(spaced, patches, pad, psize)
-            D = denoisedFromPatches(net, torch.unsqueeze(x, 0), t_cur, latents_pos, None, indices, t_goal=0, wrong=False, batch_size=patch_batch_size, track_grad=True)
+            D = denoisedFromPatches(
+                net,
+                torch.unsqueeze(x, 0),
+                t_cur,
+                latents_pos,
+                None,
+                indices,
+                t_goal=0,
+                wrong=False,
+                batch_size=patch_batch_size,
+                track_grad=True,
+                use_checkpoint=checkpoint_denoiser,
+            )
             D = torch.squeeze(D, dim=0)
             score = (D-x)/t_cur**2
             z = randn_like(x)
@@ -357,6 +383,7 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
                     x0hat,
                     inverseop,
                     pad=pad,
+                    w=w,
                     return_details=True,
                     data_gradient_scale=data_gradient_scale,
                 )
@@ -367,6 +394,7 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
                     x0hat,
                     inverseop,
                     pad=pad,
+                    w=w,
                     data_gradient_scale=data_gradient_scale,
                 )
                 raw_norm_grad = None
@@ -413,7 +441,7 @@ def dps(net, latents, latents_pos, inverseop, noisy=None, randn_like = torch.ran
                 item.update(tensor_stats('projected', x_after_data))
                 item.update(tensor_stats('x_next', x_next))
                 trace_records.append(item)
-            x = x_next
+            x = x_next.detach().requires_grad_()
         if intermediate_dir and intermediate_interval > 0:
             if i % intermediate_interval == 0 or i == num_steps-1:
                 makeFigures(
@@ -436,7 +464,7 @@ def fixed_patch_dps(net, latents, latents_pos, inverseop, noisy=None, randn_like
               intermediate_dir=None, intermediate_interval=5, data_gradient_scale=None,
               trace_file=None, trace_interval=0, stop_after_outer_steps=None,
               patch_batch_size=None, sampler='patch_average', overlap=8,
-              checkpoint_denoiser=False):
+              checkpoint_denoiser=False, sigma_schedule='edm'):
     del S_churn, S_min, S_max, S_noise
     if sampler == 'patch_average':
         denoise_fn = denoisedOverlap
@@ -449,9 +477,7 @@ def fixed_patch_dps(net, latents, latents_pos, inverseop, noisy=None, randn_like
 
     w = len(latents[0,0,0,:])
     x_init = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
-    step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
-    t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
-    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+    t_steps = make_sigma_steps(net, num_steps, sigma_min, sigma_max, rho, latents.device, sigma_schedule)
 
     x = sigma_max * torch.randn_like(x_init)
     x = torch.nn.functional.pad(x_init, (pad, pad, pad, pad), "constant", 0).requires_grad_()
@@ -512,6 +538,7 @@ def fixed_patch_dps(net, latents, latents_pos, inverseop, noisy=None, randn_like
                     x0hat,
                     inverseop,
                     pad=pad,
+                    w=w,
                     return_details=True,
                     data_gradient_scale=data_gradient_scale,
                 )
@@ -522,6 +549,7 @@ def fixed_patch_dps(net, latents, latents_pos, inverseop, noisy=None, randn_like
                     x0hat,
                     inverseop,
                     pad=pad,
+                    w=w,
                     data_gradient_scale=data_gradient_scale,
                 )
                 raw_norm_grad = None
@@ -570,7 +598,7 @@ def fixed_patch_dps(net, latents, latents_pos, inverseop, noisy=None, randn_like
                 item.update(tensor_stats('projected', x_after_data))
                 item.update(tensor_stats('x_next', x_next))
                 trace_records.append(item)
-            x = x_next
+            x = x_next.detach().requires_grad_()
         if intermediate_dir and intermediate_interval > 0:
             if i % intermediate_interval == 0 or i == num_steps-1:
                 makeFigures(
@@ -590,14 +618,11 @@ def langevin(net, latents, latents_pos, inverseop, noisy=None, randn_like = torc
               clean=None, sigma_min=0.005, sigma_max = 0.05, rho=7, zeta=0.3, pad=64, psize=64,
               S_churn=0, S_min=0, S_max=float('inf'), S_noise=1, ddnm=False,
               intermediate_dir=None, intermediate_interval=5, stop_after_outer_steps=None,
-              patch_batch_size=None):
+              patch_batch_size=None, sigma_schedule='edm'):
     w = len(latents[0,0,0,:])
     x_init = torch.clamp(inverseop.Adagger(noisy), min=0, max=1)
 
-    step_indices = torch.arange(num_steps, dtype=torch.float64, device=latents.device)
-    t_steps = (sigma_max ** (1 / rho) + step_indices / (num_steps - 1) * (sigma_min ** (1 / rho) - sigma_max ** (1 / rho))) ** rho
-    #t_steps = torch.from_numpy(np.geomspace(sigma_max, sigma_min, num=num_steps)).to(latents.device)
-    t_steps = torch.cat([net.round_sigma(t_steps), torch.zeros_like(t_steps[:1])])
+    t_steps = make_sigma_steps(net, num_steps, sigma_min, sigma_max, rho, latents.device, sigma_schedule)
     #print(t_steps)
     x = x_init #might initialize with pure noise, depends
     x = torch.nn.functional.pad(x, (pad, pad, pad, pad), "constant", 0)
@@ -760,6 +785,7 @@ def fill_lion_metadata_defaults(network_pkl, image_size, pad, psize, channels):
 @click.option('--steps', 'num_steps',      help='Number of sampling steps', metavar='INT',                          type=click.IntRange(min=1), default=18, show_default=True)
 @click.option('--sigma_min',               help='Lowest noise level  [default: varies]', metavar='FLOAT',           type=click.FloatRange(min=0, min_open=True))
 @click.option('--sigma_max',               help='Highest noise level  [default: varies]', metavar='FLOAT',          type=click.FloatRange(min=0, min_open=True))
+@click.option('--sigma_schedule',          help='Sampler sigma spacing.', type=click.Choice(['edm', 'geometric']), default='edm', show_default=True)
 @click.option('--rho',                     help='Time step exponent', metavar='FLOAT',                              type=click.FloatRange(min=0, min_open=True), default=7, show_default=True)
 @click.option('--S_churn', 'S_churn',      help='Stochasticity strength', metavar='FLOAT',                          type=click.FloatRange(min=0), default=0, show_default=True)
 @click.option('--S_min', 'S_min',          help='Stoch. min noise level', metavar='FLOAT',                          type=click.FloatRange(min=0), default=0, show_default=True)
@@ -918,6 +944,7 @@ def main(network_pkl, image_size, outdir, image_dir, name, views, blursize, scal
                 trace_interval=trace_interval,
                 stop_after_outer_steps=stop_after_outer_steps,
                 patch_batch_size=patch_batch_size,
+                checkpoint_denoiser=checkpoint_denoiser,
                 **sampler_kwargs,
             )
         elif sampler == 'pc':

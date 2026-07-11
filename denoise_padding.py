@@ -302,7 +302,21 @@ def denoisedOverlap(
     temp[:,:,pad:N-pad, pad:N-pad] = output[:,:,pad:N-pad, pad:N-pad]
     return temp
 
-def denoisedFromPatches(net, x, t_hat, latents_pos, class_labels, indices, t_goal = -1, avg=1, spaced=[], wrong=False, batch_size=None, track_grad=True):
+def denoisedFromPatches(
+    net,
+    x,
+    t_hat,
+    latents_pos,
+    class_labels,
+    indices,
+    t_goal=-1,
+    avg=1,
+    spaced=[],
+    wrong=False,
+    batch_size=None,
+    track_grad=True,
+    use_checkpoint=False,
+):
     if len(spaced) > 1:
         indices = getIndices(spaced, 5, 24, 56)
     if wrong:
@@ -331,7 +345,19 @@ def denoisedFromPatches(net, x, t_hat, latents_pos, class_labels, indices, t_goa
             pos_input[local_i,:,:,:] = torch.squeeze(latents_pos[:,:,z[0]:z[1], z[2]:z[3]])
         grad_context = contextlib.nullcontext() if track_grad else torch.no_grad()
         with grad_context:
-            bigout_chunks.append(net(x_input, t_hat, pos_input, class_labels).to(torch.float64))
+            def denoise_chunk(image, position):
+                return net(image, t_hat, position, class_labels)
+
+            if use_checkpoint and track_grad:
+                bigout = activation_checkpoint(
+                    denoise_chunk,
+                    x_input,
+                    pos_input,
+                    use_reentrant=False,
+                )
+            else:
+                bigout = denoise_chunk(x_input, pos_input)
+            bigout_chunks.append(bigout.to(torch.float64))
     bigout = torch.cat(bigout_chunks, dim=0)
 
     for i in range(patches):
