@@ -5,7 +5,7 @@
 \chapter{Background}
 \label{ch:background}
 
-This chapter introduces only the concepts needed to interpret the experiments. These are the CT forward problem and its missing-data regimes, variance-exploding diffusion priors, the PaDIS patch construction and the reconstruction algorithms used for comparison.
+This section introduces only the concepts needed to interpret the experiments. These are the CT forward problem and its missing-data regimes, variance-exploding diffusion priors, the PaDIS patch construction and the reconstruction algorithms used for comparison.
 
 \section{Computed Tomography}
 \label{sec:basics}
@@ -323,7 +323,7 @@ M=(k+1)P-N,
 \label{eq:padis_padding}
 \end{equation}
 
-giving a padded image of size $(N+2M)\times(N+2M)$. It then considers many different non-overlapping patch partitions, indexed by shifts
+giving a padded image of size $(N+2M)\times(N+2M)$. PaDIS then considers many different non-overlapping patch partitions, indexed by shifts
 
 \begin{equation}
 (i,j)\in\{0,\dots,M-1\}^2.
@@ -360,7 +360,7 @@ where $\mathbf{z}_{i,j,r}$ denotes the $r$th patch under shift $(i,j)$, $\mathbf
 \label{eq:padis_whole_image_score_sum}
 \end{equation}
 
-The implementation fixes the padded border at zero and omits its score, while the patch terms are learned by the denoising network. Computing this over all possible partitions at each sampling step would be prohibitively expensive, so sampling and reconstruction instead select one random shift at each iteration and use a stochastic estimate of the whole-image score. For a selected shift $(i,j)$, this gives
+The PaDIS implementation fixes the padded border at zero and omits its score, while the denoising network learns the patch terms. Computing all partitions at each step would be prohibitively expensive, so sampling and reconstruction instead select one random shift and use a stochastic whole-image score estimate. For shift $(i,j)$, this gives
 
 \begin{equation}
 \mathbf{s}_{\mathrm{PaDIS}}(\mathbf{z},\sigma)
@@ -372,7 +372,7 @@ G_{i,j,r}^T
 \label{eq:padis_score_estimate}
 \end{equation}
 
-where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. The PaDIS paper found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions \cite{}.
+where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. In the original PaDIS paper, Hu et al. found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions \cite{}.
 
 \section{Reconstruction Methods}
 \label{sec:reconstruction_methods}
