@@ -134,10 +134,15 @@
 %TC:ignore
 \tableofcontents
 
+\clearpage
+\phantomsection
 \listoffigures
 
+\clearpage
+\phantomsection
 \listoftables
 
+\clearpage
 \printnomenclature
 %TC:endignore
 
@@ -175,6 +180,7 @@
 %\bibliographystyle{unsrt} % Use for unsorted references  
 %\bibliographystyle{plainnat} % use this to have URLs listed in References
 \cleardoublepage
+\phantomsection
 \bibliography{References/references} % Path to your References.bib file
 
 
@@ -202,6 +208,7 @@
 \end{appendices}
 
 % *************************************** Index ********************************
-\printthesisindex % If index is present
+% No index is present, so do not emit an empty index page.
+% \printthesisindex
 
 \end{document}
