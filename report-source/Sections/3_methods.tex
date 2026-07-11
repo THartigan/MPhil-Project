@@ -1,0 +1,165 @@
+\ifpdf
+    \graphicspath{{Sections/3_methods_figs/Raster/}{Sections/3_methods_figs/PDF/}{Sections/3_methods_figs/}}
+\else
+    \graphicspath{{Sections/3_methods_figs/Vector/}{Sections/3_methods_figs/}}
+\fi
+
+\chapter{Methods}
+\label{sec:method}
+
+\section{The Dataset}
+We use the LIDC-IDRI dataset \cite{lidc}, which contains 1018 chest CT scans from 1010 patients as DICOM images \cite{DICOM}. LION retains one scan per patient and saves each axial slice and nodule mask as a $512\times512$ NumPy array, preventing leakage between repeat scans. All but the native-resolution experiments downsample these arrays to $256\times256$ during loading.
+
+The archived experiment split assigns sorted patient-ID slots to train, validation and test sets, ensuring that no patient contributes slices to more than one set. The default PaDIS regime selects a total of at most $4$ slices per patient, capped by the smaller of the available nodule and non-nodule counts before division between both classes. Patients without annotated nodules can therefore contribute no images. The detailed breakdown is presented in \autoref{tab:lidc_split_sizes}.
+
+\begin{table}[ht] 
+    \centering 
+    \begin{tabular}{lccc} 
+        \hline \textbf{Split} & \textbf{Patient-ID slots} & \textbf{Images in 4-slice regime} & \textbf{Images in all-slice regime} \\
+        \hline 
+        Train & 809 & 2713 & 189725 \\ 
+        Validation & 101 & 328 & 27426 \\ 
+        Test & 102 & 326 & 25719 \\ 
+        \hline Total & 1012 & 3367 & 242870 \\ 
+        \hline 
+    \end{tabular}
+    \caption[Processed LIDC-IDRI split sizes.]{Processed LIDC-IDRI split used for the completed experiments. The 1012 sorted patient-ID slots include two empty slots retained to preserve the archived split, so they do not represent 1012 contributing patients.}
+    \label{tab:lidc_split_sizes} 
+\end{table}
+
+\section{Experimental Geometry}
+In this work, we use a 2D fan-beam CT geometry implemented using LION's tomosipo-based CT operators \cite{}. Each LIDC-IDRI slice is treated independently with a $300\,\mathrm{mm}\times300\,\mathrm{mm}$ in-plane field of view. The default experiments reconstruct a $256\times 256$ grid, whilst the explicitly labelled native-resolution experiments use a $512\times 512$ grid. The detector contains $900$ bins over a $900\, \mathrm{mm}$ detector width, with a $575\,\mathrm{mm}$ source-to-origin distance and a $1050\,\mathrm{mm}$ source-to-detector distance. The simulated measurements are noise-free projections of normalised intensity rather than calibrated attenuation, isolating sparse sampling and limited angular coverage from photon-count statistics.
+
+We use fan-beam geometry to test whether the PaDIS conclusions transfer beyond Hu et al.'s parallel-beam setup and to reproduce the finite-source divergence used by clinical scanners \cite{}. This choice does not make the experiment clinically realistic. The operator remains two-dimensional and noise-free, and omits scatter, beam hardening, motion and cone-beam effects.
+
+\section{Model Training}
+\label{sec:methods-model-training}
+
+In this work, we train patch-based diffusion models, whole-image diffusion models and PnP denoisers to aid reconstruction.
+
+\subsection{Diffusion Model Training}
+Diffusion-prior training uses the variance-exploding regime in \secref{sec:score_based_sdes}, so the denoisers provide scores for unconditional generation and inverse problems as explained in \secref{subsec:diffusion_models_inverse_problems} and \secref{subsec:padis_approach}.
+
+Diffusion denoisers use the noise-conditional NCSN++ model, $F_{\boldsymbol{\phi}}$ \cite{song...}, with EDM preconditioning from \secref{subsec:edm_preconditioning}. Noise is passed to every residual block, and default inputs comprise the noisy image and $[-1,1]$ normalised pixel coordinates, while the position ablation receives only the image. Each model has four resolution levels, four residual blocks per level, 128 base channels, dropout 0.05 and attention at resolution 16. Patch channel counts are $128$, $256$, $256$ and $256$, while whole-image counts are $128$, $256$, $256$ and $512$.
+
+All diffusion models used Adam \cite{kingma} with learning rate $2\times10^{-4}$, ramped over the first 10 million examples or patches. EDM used $\sigma_{\mathrm{data}}=0.5$, loss weight $\lambda(\sigma)=(\sigma^2+\sigma_{\mathrm{data}}^2)/(\sigma\sigma_{\mathrm{data}})^2$, and $\log\sigma\sim\mathcal{N}(-1.2,1.2^2)$ truncated to $[0.002,40]$. On an RTX PRO 6000, whole-image models trained for 24 hours and patch-based models for 12.
+
+Whole-image denoisers are trained on complete $256\times256$ slices. The default patch model samples sizes 56, 32 and 16 with probabilities 0.5, 0.3 and 0.2, while the native model replaces 56 by 64. The ablations use all processed slices, alternative patch sizes or no position channels, with patch schedules in \autoref{tab:patch_size_schedules}.
+
+Validation monitoring continued throughout training. During the final six hours, validation was increased and the exponential-moving-average checkpoint with the minimum mean EDM validation loss during this period, referred to as \texttt{min\_intense\_val}, was selected for reconstruction and generation.
+
+\begin{table}[ht] 
+    \centering 
+    \begin{tabular}{lccc} 
+        \hline 
+        \textbf{Ablation} & \textbf{Sampled patch sizes} & \textbf{Sampling probabilities} & \textbf{Padding width} \\ 
+        \hline 
+        $P=8$ & $8$ & $1.0$ & $8$ \\ 
+        $P=16$ & $8,\ 16$ & $0.3,\ 0.7$ & $16$ \\ 
+        $P=32$ & $8,\ 16,\ 32$ & $0.2,\ 0.3,\ 0.5$ & $32$ \\ 
+        $P=56$ & $16,\ 32,\ 56$ & $0.2,\ 0.3,\ 0.5$ & $24$ \\ 
+        $P=96$ & $32,\ 64,\ 96$ & $0.2,\ 0.3,\ 0.5$ & $32$ \\ 
+        \hline 
+    \end{tabular} 
+    \caption[PaDIS patch-size training schedules.]{Patch-size schedules used for the PaDIS patch-size ablations. Each training step samples one patch size according to the listed probabilities. The $P=56$ row is the default PaDIS patch schedule used for the main 256-resolution patch model.}
+    \label{tab:patch_size_schedules}
+\end{table}
+
+\subsection{PnP Denoiser Training}
+PnP training uses two DRUNet denoisers \cite{zhang_plug-and-play_2021} trained separately for LION's PnP-ADMM reconstruction \cite{chan_plug-and-play_2016}. Each training step samples Gaussian noise uniformly from $\sigma \in[0,0.05]$ and adds it to the clean image, from which the model learns to recover the clean target.
+
+Both models use the four-slice split, Adam at $10^{-4}$ for 100 epochs, batch size 8 and MSE loss. One receives only the noisy image, while the other adds noise level as a constant channel. Both have 64 internal channels, four blocks per level, bias-free convolutions and leaky-ReLU activations. We use the lowest-validation-loss checkpoint from the epoch-wise checks, supplying the conditioned model with noise level 0.03 during reconstruction.
+
+\section{Reconstructor Implementation}
+\label{sec:methods-reconstructor-implementation}
+
+The original PaDIS paper and released code specify some methods differently (\secref{sec:discussion-reproducibility}) \cite{}. Paper-style follows the written algorithms, Public-compatible follows the released code, and LION-physics is our operator-normalised extension. The reproduction tracks exist only where the original PaDIS work gives enough detail, whereas LION-physics covers all methods. \autoref{tab:methods_by_implementation} summarises these combinations, with differences in \secref{subsec:public-compatible-implementation} and \secref{subsec:lion-physics-implementations}.
+
+\begin{table}[ht]
+  \centering
+  \caption[Reconstruction methods by implementation track.]{Reconstruction methods implemented in each track. A star indicates an additional modification or numerical stabilisation described below.}
+  \label{tab:methods_by_implementation}
+  \begin{tabular}{lccc}
+  \hline
+  \textbf{Method} & \textbf{Paper-style} & \textbf{Public-compatible} & \textbf{LION-physics} \\
+  \hline
+  Baseline FDK              & --             & --             & \(\checkmark\) \\
+  Chambolle--Pock TV        & --             & --             & \(\checkmark^*\) \\
+  PnP-ADMM                  & --             & --             & \(\checkmark\) \\
+  Whole-image diffusion     & \(\checkmark\) & --             & \(\checkmark\) \\
+  Langevin                  & \(\checkmark\) & \(\checkmark^*\) & \(\checkmark\) \\
+  Predictor-corrector       & \(\checkmark^*\) & \(\checkmark^*\) & \(\checkmark\) \\
+  VE-DDNM                   & \(\checkmark^*\) & \(\checkmark^*\) & \(\checkmark^*\) \\
+  Patch averaging           & --             & \(\checkmark^*\) & \(\checkmark\) \\
+  Patch stitching           & --             & \(\checkmark^*\) & \(\checkmark\) \\
+  PaDIS-DPS                 & \(\checkmark\) & \(\checkmark^*\) & \(\checkmark\) \\
+  \hline
+  \end{tabular}
+\end{table}
+
+All tracks use the same LIDC-IDRI images, denoisers and LION measurements. Paper-style therefore refers to the equations and sampling choices in the original PaDIS paper, rather than exact reproduction of its AAPM parallel-beam experiments. We evaluate LION-physics as an extension without claiming direct reproduction of Hu et al.'s algorithms, using hyperparameters re-tuned for the LION operators.
+
+Throughout, an outer step means moving to the next noise level, while an inner step repeats the sampler update at the current noise level. Unless stated otherwise, diffusion reconstructions use 100 geometrically spaced outer levels from \(\sigma_{\max}=10\) to \(\sigma_{\min}=0.002\), with 10 inner updates at each level. The 8-view experiments instead use \(\sigma_{\min}=0.003\). The schedule ablation changes only the spacing of the outer levels from geometric to EDM-style. Predictor-corrector is an exception because each adjacent pair receives one predictor and one corrector update. Paper-style and LION-physics VE-DDNM instead use 1000 outer levels with one update per level, while Public-compatible VE-DDNM retains the released code's 100 outer levels with 10 inner updates.
+
+For the analytic baseline, we apply LION's Hann-filtered FDK with frequency scaling 0.3. Hu et al. used ADMM-TV as their iterative baseline \cite{}. We retain its isotropic TV objective but use LION's CP implementation from \secref{subsec:iterative_reconstruction_denoising_priors} \cite{}. Validation selected \(\lambda=0.001\) and 1000 iterations. We clipped outputs to \([0,1]\) without non-negativity and therefore report CP rather than ADMM-TV. We keep PnP-ADMM separate, using \(\eta=3\times10^{-5}\), 60 outer iterations, at most 50 conjugate-gradient iterations and tolerance \(10^{-7}\), and clip its states and outputs to \([0,1]\).
+
+\subsection{Public-Compatible Implementations}
+\label{subsec:public-compatible-implementation}
+We implemented these methods to match the publicly available codebase, which differs from the descriptions in the original PaDIS paper in several important ways \cite{}. Its DPS implementation differentiates the norm of the residual and begins from FDK, whilst predictor-corrector evaluates the denoiser at $\sigma_k$, divides the score by $\sigma_{k+1}^2$ and reuses the predictor patch layout. VE-DDNM uses $100$ noise levels with $10$ updates at each, rather than $1000$ separate levels.
+
+The Public-compatible track retains these rules, clipping and patch randomisation with fixed scales for LION geometry. Final experiments use the geometric schedule from the original PaDIS paper, with the public EDM-style schedule as an ablation. Translation validation used an adapted version of the released code in the companion \texttt{PaDIS} directory with the same slices, checkpoint and geometry. Across three matched DPS reconstructions, target means were $33.12$ versus $33.16\,\mathrm{dB}$ PSNR and $0.836$ versus $0.834$ SSIM, while cross-implementation SSIM was $0.996$. The remaining difference was within sampler variation, and patch layouts and intermediate states were used to check other public helpers.
+
+\subsection{LION-physics Implementations}
+\label{subsec:lion-physics-implementations}
+Our LION-physics extension to the original PaDIS work removes these fixed scales. Following \autoref{eq:scaled_data_consistency_update}, the LION-physics update divides the squared-residual gradient by $L_F=\lVert F\rVert_2^2$, where $F$ maps the normalised image to its sinogram and its norm is estimated with 20 power iterations and tolerance $10^{-4}$. This makes the data-consistency coefficient more comparable between geometries, but does not guarantee sampler convergence.
+
+These implementations otherwise use the geometric schedule from the original PaDIS paper, with predictor-corrector retaining the paper-style noise-level and patch-layout choices. Every VE-DDNM track clips its FDK pseudoinverse terms to prevent non-finite values, while paper-style and LION-physics also clip the corrected state. The selected LION-physics patch VE-DDNM further uses noise scale 0.5, and operator normalisation applies only to diffusion data updates.
+
+Patch averaging and stitching use fixed layouts with an eight-pixel overlap. Averaging takes the mean of all predictions covering each pixel, whilst stitching allows later patches to replace earlier values in overlaps. Both use DPS, but unlike PaDIS they do not repeatedly redraw shifted patch partitions.
+
+\subsection{Hyperparameter Tuning}
+Hyperparameter selection used only validation data. Finite runs were ranked by mean PSNR, treating differences below $0.1\,\mathrm{dB}$ as ties, then by SSIM within $0.01$, and finally by MAE. Where possible, one setting covered 8 and 20 views. Higher-view experiments use this setting without dedicated tuning, whilst the 512-resolution experiment was tuned separately. The selected values are stored in LION and listed in the project README. We did not tune the non-default patch-size and no-position ablations separately, so they inherit the default $P=56$ setting.
+
+\section{Experiments}
+
+The primary comparison uses noise-free sinograms from 8 and 20 uniformly spaced views over \(360^\circ\) at \(256\times256\). This comparison includes the combinations in \autoref{tab:methods_by_implementation}, which produce the results in \autoref{tab:main-quality}. Paper-style and Public-compatible test the central PaDIS claim under two readings of the combined specification, while LION-physics evaluates our extension on the same images, priors and measurements.
+
+Three extensions test transfer. Selected methods are evaluated with 60 full-angle views and with 20 views over a \(120^\circ\) arc. The latter retains the legacy key \texttt{ct\_fanbeam\_180}, but is a limited-angle stress test rather than the 180-view experiment in the original PaDIS paper. Native-resolution experiments use 60 full-angle views on a \(512\times512\) grid and compare FDK, CP-TV, public-compatible PaDIS-DPS and LION-physics PaDIS-DPS. We did not train a whole-image model at this resolution.
+
+All quantitative ablations use the 20-view full-angle problem. The patch-size, dataset-size and positional-encoding analyses revisit questions examined by Hu et al. \cite{}, while initialisation and schedule comparisons resolve paper--code differences. Patch sizes \(P\in\{8,16,32,56,96\}\) are compared with whole-image diffusion, and the four-slice regime with all processed slices for both priors. The position analysis crosses coordinate channels with FDK or Gaussian initialisation, while the schedule ablation compares the two outer-level spacings. Sampler comparisons apply Langevin, predictor-corrector, VE-DDNM and VE-DPS to patch and, where implemented, whole-image priors.
+
+Unconditional generation presents four samples from each of four priors. These are whole-image diffusion, fixed patch stitching, fixed patch averaging and randomly shifted PaDIS. Sampling uses 300 geometric outer levels with one inner update per level and a common Langevin coefficient and noise scale of 1. We did not tune these settings separately, so the outputs illustrate boundary behaviour rather than rank distributional quality.
+
+Standard reconstruction jobs use seed 33 and the same first 25 test images. Fixed patch-averaging and patch-stitching rows, unconditional generation, and all \(512\times512\) reconstructions use four images or samples because of their substantially greater cost. We identify these four-image subsets explicitly and do not treat them as equally precise estimates.
+
+\section{Metrics}
+
+Metric computation uses the held-out target in the common normalised-intensity domain with data range one. Reconstructions are evaluated without per-image rescaling, and clipping is applied only where specified by each method's configuration. This work reports mean absolute error (MAE), peak signal-to-noise ratio (PSNR), and structural similarity (SSIM) \cite{}. For \(N\) image pixels,
+\begin{align}
+\mathrm{MAE}(\hat{\mathbf{x}},\mathbf{x})
+&=\frac{1}{N}\lVert\hat{\mathbf{x}}-\mathbf{x}\rVert_1,\\
+\mathrm{PSNR}(\hat{\mathbf{x}},\mathbf{x})
+&=10\log_{10}\left(\frac{1}{\mathrm{MSE}(\hat{\mathbf{x}},\mathbf{x})}\right),
+\end{align}
+where the peak value is one. SSIM measures local agreement in luminance, contrast and structure. Higher PSNR and SSIM and lower MAE indicate closer agreement, but none establishes that clinically important features have been preserved.
+
+Measurement consistency is reported separately as the relative sinogram residual
+\begin{equation}
+\mathrm{RSR}(\hat{\mathbf{x}})
+=
+\frac{\lVert A\hat{\mathbf{x}}-\mathbf{y}\rVert_2}
+{\lVert\mathbf{y}\rVert_2}.
+\end{equation}
+Low RSR shows that a reconstruction explains the simulated measurements. A low RSR does not by itself imply similarity to the target because sparse and limited-angle operators have large poorly constrained subspaces.
+
+We report image-level means and asymmetric central 95\% confidence intervals from 2000 deterministic bootstrap resamples using seed 33 \cite{}, bootstrapping images rather than training runs to capture slice variation but not retraining uncertainty. For figures, we clip normalised images to \([0,1]\), and abbreviate ``Normalised Intensity'' to NI. HU panels use \autoref{eq:hounsfield_units}. We clip each row to the 15th and 95th percentiles of non-background ground-truth pixels, defined by normalised intensity above 0.02, and apply the same limits to every reconstruction and target in that row to prevent method-dependent contrast adjustment. Colour bars report these limits. The 50-mm scale bars use the configured 300-mm field of view rather than patient-native DICOM spacing. We assess unconditional generations qualitatively because they have no paired target.
+\section{Compute and Reproducibility}
+For final training and reconstruction, we used a Google-hosted NVIDIA RTX PRO 6000 GPU, while fixed-validation tuning also used a local NVIDIA GTX 1070. Using seed 33 throughout, we developed the pipeline independently in LION, used the released repository only to check the Public-compatible track and selected checkpoints before testing. Weights \& Biases records training, and we retain artefacts on persistent cloud storage while providing reproduction scripts and instructions in \texttt{scripts/paper\_scripts/PaDIS}.
+
+% - Implemented in LION - Produced three implementation tracks: Explicit paper
+% implementation, public-repo matching setup, and one which uses correct operator
+% normalisations to increase cross-problem reliability, as described in
+% \ref{subsec:lion-physics}. - Created LION-physics implementations for all
+% experiments, but only paper and public-repo matching implementations for those
+% which were actually described in sufficient detail for reproduction in those
+% respective soruces. This is summarised in \autoref{tab:implemented-methods}.

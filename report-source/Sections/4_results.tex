@@ -1,0 +1,318 @@
+\ifpdf
+    \graphicspath{{Sections/4_results_figs/Raster/}{Sections/4_results_figs/PDF/}{Sections/4_results_figs/}}
+\else
+    \graphicspath{{Sections/4_results_figs/Vector/}{Sections/4_results_figs/}}
+\fi
+
+\chapter{Results}
+\label{sec:results}
+
+\section*{Reporting Conventions}
+Quantitative tables show $\mathrm{mean}^{+u}_{-l}$ with asymmetric 95\% bootstrap confidence intervals from 2000 resamples. Bold marks the best displayed value, including ties. RSR denotes relative sinogram residual, PC predictor--corrector, CP Chambolle--Pock and NI normalised intensity. Paper, Public-compatible and LION-physics identify implementations. Test size is $n=25$, except fixed patch-averaging, patch-stitching and native-resolution rows, which use $n=4$. Runtime values are means without confidence intervals.
+
+\section{Reconstruction Quality}
+
+We present the main results in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-physics PaDIS VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-physics DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the paper-style and public-compatible DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example.
+
+\begin{center}
+\centering
+\includegraphics[width=\textwidth]{figure5_ct_reconstruction.pdf}
+\captionsetup{type=figure,hypcap=false}
+\caption[Representative 20- and 60-view reconstructions.]{Representative LION-physics fan-beam reconstructions using FDK, CP, whole-image VE-DPS and PaDIS-DPS. The top two rows use 60 views and an HU display. The bottom two use 20 views and NI.}
+\label{fig:results-ct-reconstruction}
+\end{center}
+
+We observed the same sampler dependence across geometries (\autoref{tab:extra-quality} and \autoref{fig:results-extra-ct}). PaDIS with VE-DDNM led the 60-view experiment at $41.55\,\mathrm{dB}$ and $0.951$ SSIM. In the 120-degree limited-angle problem, whole-image VE-DPS gave the best image metrics, whereas PaDIS-DPS gave the smallest residual. At native resolution, LION-physics PaDIS reached $40.08\,\mathrm{dB}$ and $0.960$ SSIM (\autoref{tab:ct512} and \autoref{fig:results-512-ct}), improving on CP-TV by $6.31\,\mathrm{dB}$.
+
+\clearpage
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption[Main 8- and 20-view results.]{Main 8- and 20-view fan-beam results.}\label{tab:main-quality}
+\small
+\setlength{\tabcolsep}{2.4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lllcccccccc}
+\toprule[1.1pt]
+\multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Reconstruction method} & \multicolumn{4}{c}{\bfseries 20-View 360 Degrees} & \multicolumn{4}{c}{\bfseries 8-View 360 Degrees} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-7} \cmidrule(lr){8-11}
+ & \textbf{Sampler} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+\midrule
+\textbf{Paper} & VE--DPS & Whole-Image & $33.97^{+0.67}_{-0.62}$ & $0.825^{+0.020}_{-0.022}$ & $0.0137^{+0.0010}_{-0.0010}$ & $0.0373^{+0.0026}_{-0.0027}$ & $29.10^{+0.75}_{-0.76}$ & $0.743^{+0.024}_{-0.024}$ & $0.0195^{+0.0015}_{-0.0014}$ & $0.0330^{+0.0036}_{-0.0037}$ \\
+ & Langevin & PaDIS & $30.74^{+0.91}_{-0.94}$ & $0.680^{+0.041}_{-0.045}$ & $0.0221^{+0.0026}_{-0.0025}$ & $0.0800^{+0.0129}_{-0.0123}$ & $26.08^{+0.53}_{-0.50}$ & $0.589^{+0.035}_{-0.038}$ & $0.0295^{+0.0020}_{-0.0020}$ & $0.0542^{+0.0066}_{-0.0064}$ \\
+ & PC & PaDIS & $25.46^{+0.22}_{-0.23}$ & $0.412^{+0.018}_{-0.018}$ & $0.0371^{+0.0011}_{-0.0011}$ & $0.0732^{+0.0062}_{-0.0072}$ & $22.30^{+0.38}_{-0.40}$ & $0.330^{+0.011}_{-0.010}$ & $0.0502^{+0.0022}_{-0.0021}$ & $0.0469^{+0.0039}_{-0.0044}$ \\
+ & VE--DDNM & PaDIS & $29.13^{+0.92}_{-1.03}$ & $0.651^{+0.042}_{-0.044}$ & $0.0250^{+0.0031}_{-0.0027}$ & $0.0059^{+0.0008}_{-0.0007}$ & $22.42^{+0.38}_{-0.38}$ & $0.330^{+0.030}_{-0.030}$ & $0.0505^{+0.0029}_{-0.0027}$ & $0.0320^{+0.0039}_{-0.0036}$ \\
+ & VE--DPS & PaDIS & $32.71^{+0.86}_{-0.81}$ & $0.777^{+0.040}_{-0.045}$ & $0.0160^{+0.0019}_{-0.0018}$ & $0.0312^{+0.0082}_{-0.0072}$ & $27.15^{+0.70}_{-0.73}$ & $0.669^{+0.039}_{-0.041}$ & $0.0246^{+0.0026}_{-0.0022}$ & $0.0227^{+0.0047}_{-0.0043}$ \\
+\addlinespace[2pt]\midrule
+\textbf{Public-compatible} & Langevin & PaDIS & $31.86^{+0.79}_{-0.77}$ & $0.795^{+0.030}_{-0.037}$ & $0.0165^{+0.0018}_{-0.0018}$ & $0.0353^{+0.0025}_{-0.0025}$ & $23.88^{+0.79}_{-0.73}$ & $0.553^{+0.032}_{-0.032}$ & $0.0402^{+0.0036}_{-0.0036}$ & $0.0341^{+0.0024}_{-0.0024}$ \\
+ & PC & PaDIS & $28.15^{+0.34}_{-0.34}$ & $0.627^{+0.029}_{-0.028}$ & $0.0264^{+0.0013}_{-0.0014}$ & $0.0705^{+0.0082}_{-0.0078}$ & $23.86^{+0.61}_{-0.56}$ & $0.462^{+0.021}_{-0.018}$ & $0.0423^{+0.0030}_{-0.0029}$ & $0.0335^{+0.0038}_{-0.0040}$ \\
+ & VE--DDNM & PaDIS & $30.00^{+1.07}_{-1.16}$ & $0.712^{+0.052}_{-0.056}$ & $0.0215^{+0.0035}_{-0.0032}$ & $0.0048^{+0.0005}_{-0.0005}$ & $25.85^{+0.64}_{-0.63}$ & $0.602^{+0.043}_{-0.046}$ & $0.0300^{+0.0029}_{-0.0028}$ & $0.0061^{+0.0005}_{-0.0004}$ \\
+ & VE--DPS & Patch avg. & $35.77^{+0.32}_{-0.39}$ & $0.882^{+0.023}_{-0.021}$ & $0.0102^{+0.0008}_{-0.0005}$ & $0.0266^{+0.0061}_{-0.0059}$ & $29.05^{+1.73}_{-1.43}$ & $0.778^{+0.044}_{-0.048}$ & $0.0179^{+0.0030}_{-0.0029}$ & $0.0171^{+0.0053}_{-0.0041}$ \\
+ & VE--DPS & Patch stitch. & $35.04^{+0.34}_{-0.19}$ & $0.889^{+0.011}_{-0.021}$ & $0.0109^{+0.0003}_{-0.0002}$ & $0.0353^{+0.0092}_{-0.0120}$ & $27.79^{+1.15}_{-1.15}$ & $0.741^{+0.028}_{-0.025}$ & $0.0206^{+0.0023}_{-0.0023}$ & $0.0144^{+0.0021}_{-0.0021}$ \\
+ & VE--DPS & PaDIS & $32.49^{+1.10}_{-1.12}$ & $0.805^{+0.041}_{-0.045}$ & $0.0156^{+0.0022}_{-0.0022}$ & $0.0187^{+0.0027}_{-0.0024}$ & $25.50^{+0.76}_{-0.84}$ & $0.619^{+0.042}_{-0.042}$ & $0.0307^{+0.0037}_{-0.0033}$ & $0.0135^{+0.0010}_{-0.0010}$ \\
+\addlinespace[2pt]\midrule
+\textbf{LION-physics} & FDK & -- & $23.35^{+0.76}_{-0.70}$ & $0.439^{+0.019}_{-0.018}$ & $0.0483^{+0.0039}_{-0.0041}$ & $0.1008^{+0.0141}_{-0.0144}$ & $19.09^{+0.89}_{-0.77}$ & $0.305^{+0.019}_{-0.020}$ & $0.0796^{+0.0070}_{-0.0071}$ & $0.2288^{+0.0320}_{-0.0338}$ \\
+ & CP & TV & $28.62^{+0.53}_{-0.51}$ & $0.738^{+0.019}_{-0.018}$ & $0.0221^{+0.0015}_{-0.0015}$ & $0.0113^{+0.0012}_{-0.0012}$ & $24.38^{+0.74}_{-0.69}$ & $0.582^{+0.023}_{-0.023}$ & $0.0410^{+0.0040}_{-0.0039}$ & $0.0249^{+0.0042}_{-0.0046}$ \\
+ & PnP--ADMM & DRUnet (cond) & $26.12^{+1.13}_{-1.22}$ & $0.620^{+0.044}_{-0.050}$ & $0.0314^{+0.0042}_{-0.0038}$ & $0.0093^{+0.0052}_{-0.0043}$ & $17.26^{+1.04}_{-1.23}$ & $0.291^{+0.060}_{-0.058}$ & $0.0889^{+0.0211}_{-0.0178}$ & $0.1236^{+0.0649}_{-0.0507}$ \\
+ & PnP--ADMM & DRUnet & $26.12^{+1.14}_{-1.22}$ & $0.620^{+0.043}_{-0.048}$ & $0.0315^{+0.0041}_{-0.0037}$ & $0.0093^{+0.0050}_{-0.0045}$ & $17.93^{+0.95}_{-0.98}$ & $0.320^{+0.054}_{-0.052}$ & $0.0777^{+0.0137}_{-0.0125}$ & $0.0813^{+0.0274}_{-0.0199}$ \\
+ & VE--DPS & Whole-Image & $34.25^{+0.71}_{-0.66}$ & $0.865^{+0.021}_{-0.025}$ & $0.0118^{+0.0011}_{-0.0011}$ & $0.0014^{+0.0001}_{-0.0001}$ & $\mathbf{29.58^{+0.68}_{-0.60}}$ & $0.783^{+0.023}_{-0.023}$ & $0.0175^{+0.0012}_{-0.0013}$ & $\mathbf{0.0012^{+0.0001}_{-0.0001}}$ \\
+ & Langevin & PaDIS & $31.62^{+0.94}_{-0.93}$ & $0.788^{+0.045}_{-0.048}$ & $0.0167^{+0.0030}_{-0.0025}$ & $0.0015^{+0.0001}_{-0.0001}$ & $26.16^{+0.55}_{-0.52}$ & $0.652^{+0.040}_{-0.044}$ & $0.0272^{+0.0024}_{-0.0023}$ & $0.0014^{+0.0002}_{-0.0002}$ \\
+ & Langevin & Whole-Image & $33.26^{+0.63}_{-0.63}$ & $0.851^{+0.021}_{-0.021}$ & $0.0128^{+0.0011}_{-0.0011}$ & $0.0017^{+0.0001}_{-0.0001}$ & -- & -- & -- & -- \\
+ & PC & PaDIS & $28.58^{+0.44}_{-0.44}$ & $0.691^{+0.025}_{-0.027}$ & $0.0228^{+0.0013}_{-0.0013}$ & $0.0072^{+0.0005}_{-0.0005}$ & $24.41^{+0.50}_{-0.49}$ & $0.555^{+0.018}_{-0.020}$ & $0.0347^{+0.0022}_{-0.0019}$ & $0.0077^{+0.0005}_{-0.0005}$ \\
+ & PC & Whole-Image & $28.91^{+0.30}_{-0.31}$ & $0.585^{+0.013}_{-0.014}$ & $0.0242^{+0.0008}_{-0.0008}$ & $0.0208^{+0.0027}_{-0.0025}$ & -- & -- & -- & -- \\
+ & VE--DDNM & PaDIS & $\mathbf{36.49^{+0.95}_{-0.94}}$ & $0.895^{+0.021}_{-0.023}$ & $0.0103^{+0.0012}_{-0.0012}$ & $\mathbf{0.0013^{+0.0002}_{-0.0001}}$ & $27.12^{+0.66}_{-0.65}$ & $0.670^{+0.034}_{-0.037}$ & $0.0265^{+0.0020}_{-0.0021}$ & $0.0112^{+0.0018}_{-0.0016}$ \\
+ & VE--DDNM & Whole-Image & $34.19^{+1.16}_{-1.09}$ & $0.835^{+0.035}_{-0.036}$ & $0.0136^{+0.0019}_{-0.0018}$ & $0.0025^{+0.0003}_{-0.0003}$ & -- & -- & -- & -- \\
+ & VE--DPS & Patch avg. & $36.10^{+1.40}_{-1.52}$ & $\mathbf{0.914^{+0.029}_{-0.051}}$ & $\mathbf{0.0087^{+0.0024}_{-0.0015}}$ & $0.0014^{+0.0003}_{-0.0003}$ & $29.05^{+1.28}_{-1.19}$ & $\mathbf{0.805^{+0.045}_{-0.068}}$ & $\mathbf{0.0167^{+0.0034}_{-0.0025}}$ & $0.0015^{+0.0003}_{-0.0003}$ \\
+ & VE--DPS & Patch stitch. & $34.23^{+1.45}_{-1.10}$ & $0.888^{+0.034}_{-0.039}$ & $0.0107^{+0.0017}_{-0.0017}$ & $0.0018^{+0.0004}_{-0.0004}$ & $27.96^{+0.68}_{-0.68}$ & $0.773^{+0.020}_{-0.018}$ & $0.0191^{+0.0009}_{-0.0014}$ & $0.0020^{+0.0004}_{-0.0004}$ \\
+ & VE--DPS & PaDIS & $32.82^{+1.06}_{-1.06}$ & $0.816^{+0.042}_{-0.047}$ & $0.0148^{+0.0025}_{-0.0021}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ & $27.65^{+0.75}_{-0.77}$ & $0.706^{+0.041}_{-0.048}$ & $0.0229^{+0.0027}_{-0.0025}$ & $\mathbf{0.0012^{+0.0002}_{-0.0002}}$ \\
+\bottomrule[1.1pt]
+\end{tabular}
+}
+\end{table}
+\end{landscape}
+\clearpage
+
+\begin{landscape}
+\begin{table}[p]
+\centering
+\caption[Additional full- and limited-angle results.]{Reconstruction in additional full- and limited-angle geometries.}\label{tab:extra-quality}
+\small
+\setlength{\tabcolsep}{2.4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lllcccccccc}
+\toprule[1.1pt]
+\multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Reconstruction method} & \multicolumn{4}{c}{\bfseries 60-View 360 Degrees} & \multicolumn{4}{c}{\bfseries 20-View 120 Degrees} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-7} \cmidrule(lr){8-11}
+ & \textbf{Sampler} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+\midrule
+\textbf{Paper} & VE--DDNM & PaDIS & $36.70^{+1.37}_{-1.42}$ & $0.874^{+0.029}_{-0.032}$ & $0.0116^{+0.0019}_{-0.0018}$ & $0.0030^{+0.0003}_{-0.0003}$ & $26.79^{+0.76}_{-0.78}$ & $0.590^{+0.036}_{-0.035}$ & $0.0298^{+0.0028}_{-0.0027}$ & $0.0117^{+0.0018}_{-0.0016}$ \\
+\addlinespace[2pt]\midrule
+\textbf{Public-compatible} & VE--DDNM & PaDIS & $32.71^{+1.65}_{-1.71}$ & $0.781^{+0.056}_{-0.064}$ & $0.0174^{+0.0040}_{-0.0037}$ & $0.0044^{+0.0006}_{-0.0006}$ & $27.18^{+0.67}_{-0.70}$ & $0.650^{+0.045}_{-0.049}$ & $0.0263^{+0.0031}_{-0.0029}$ & $0.0066^{+0.0007}_{-0.0006}$ \\
+ & VE--DPS & PaDIS & $36.38^{+1.02}_{-1.02}$ & $0.876^{+0.025}_{-0.030}$ & $0.0112^{+0.0016}_{-0.0013}$ & $0.0288^{+0.0037}_{-0.0034}$ & $28.19^{+0.62}_{-0.61}$ & $0.750^{+0.032}_{-0.035}$ & $0.0207^{+0.0019}_{-0.0018}$ & $0.0194^{+0.0019}_{-0.0019}$ \\
+\addlinespace[2pt]\midrule
+\textbf{LION-physics} & FDK & -- & $29.05^{+0.51}_{-0.49}$ & $0.646^{+0.017}_{-0.016}$ & $0.0240^{+0.0015}_{-0.0015}$ & $0.0287^{+0.0038}_{-0.0037}$ & $20.17^{+0.24}_{-0.24}$ & $0.481^{+0.020}_{-0.018}$ & $0.0680^{+0.0018}_{-0.0017}$ & $0.2146^{+0.0090}_{-0.0098}$ \\
+ & CP & TV & $31.65^{+0.44}_{-0.40}$ & $0.835^{+0.020}_{-0.024}$ & $0.0145^{+0.0010}_{-0.0009}$ & $0.0099^{+0.0010}_{-0.0009}$ & $25.80^{+0.70}_{-0.67}$ & $0.689^{+0.017}_{-0.016}$ & $0.0328^{+0.0026}_{-0.0025}$ & $0.0127^{+0.0014}_{-0.0014}$ \\
+ & VE--DPS & Whole-Image & $37.99^{+0.97}_{-0.89}$ & $0.919^{+0.018}_{-0.022}$ & $0.0085^{+0.0011}_{-0.0011}$ & $0.0022^{+0.0001}_{-0.0002}$ & $\mathbf{30.83^{+0.46}_{-0.49}}$ & $\mathbf{0.835^{+0.019}_{-0.022}}$ & $\mathbf{0.0146^{+0.0010}_{-0.0010}}$ & $0.0016^{+0.0002}_{-0.0002}$ \\
+ & VE--DDNM & PaDIS & $\mathbf{41.55^{+1.38}_{-1.52}}$ & $\mathbf{0.951^{+0.014}_{-0.016}}$ & $\mathbf{0.0066^{+0.0011}_{-0.0010}}$ & $\mathbf{0.0012^{+0.0001}_{-0.0001}}$ & $29.96^{+0.98}_{-0.94}$ & $0.780^{+0.031}_{-0.033}$ & $0.0187^{+0.0021}_{-0.0021}$ & $0.0053^{+0.0016}_{-0.0013}$ \\
+ & VE--DPS & PaDIS & $37.12^{+1.32}_{-1.41}$ & $0.895^{+0.034}_{-0.038}$ & $0.0099^{+0.0019}_{-0.0018}$ & $0.0021^{+0.0001}_{-0.0001}$ & $29.03^{+0.61}_{-0.62}$ & $0.770^{+0.037}_{-0.044}$ & $0.0188^{+0.0023}_{-0.0020}$ & $\mathbf{0.0015^{+0.0001}_{-0.0001}}$ \\
+\bottomrule[1.1pt]
+\end{tabular}
+}
+\end{table}
+\end{landscape}
+\clearpage
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figureA10_extra_ct.pdf}
+\caption[Full- and limited-angle reconstructions.]{Additional LION-physics fan-beam reconstructions in HU. The top row uses 60 views over $360^\circ$. The bottom uses 20 views over a limited $120^\circ$ arc. Columns compare FDK, CP, whole-image VE-DPS, PaDIS-DPS and ground truth.}
+\label{fig:results-extra-ct}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption[Native-resolution 60-view results.]{Native $512\times512$ reconstruction from 60 views over $360^\circ$.}\label{tab:ct512}
+\small
+\normalsize
+\setlength{\tabcolsep}{2pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lllcccc}
+\toprule[1.1pt]
+\multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Reconstruction method} & \multicolumn{4}{c}{\bfseries $512\times512$, 60-View 360 Degrees} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-7}
+ & \textbf{Sampler} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+\midrule
+\textbf{Public-compatible} & VE--DPS & PaDIS & $39.24^{+0.12}_{-0.11}$ & $0.922^{+0.007}_{-0.004}$ & $0.0071^{+0.0003}_{-0.0003}$ & $0.0243^{+0.0041}_{-0.0046}$ \\
+\addlinespace[2pt]\midrule
+\textbf{LION-physics} & FDK & -- & $29.86^{+0.62}_{-0.63}$ & $0.699^{+0.036}_{-0.036}$ & $0.0205^{+0.0016}_{-0.0020}$ & $0.0344^{+0.0096}_{-0.0096}$ \\
+ & CP & TV & $33.77^{+0.77}_{-0.77}$ & $0.904^{+0.007}_{-0.007}$ & $0.0103^{+0.0004}_{-0.0004}$ & $0.0074^{+0.0017}_{-0.0017}$ \\
+ & VE--DPS & PaDIS & $\mathbf{40.08^{+0.68}_{-1.11}}$ & $\mathbf{0.960^{+0.004}_{-0.004}}$ & $\mathbf{0.0056^{+0.0003}_{-0.0003}}$ & $\mathbf{0.0018^{+0.0003}_{-0.0003}}$ \\
+\bottomrule[1.1pt]
+\end{tabular}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figure8_512_ct.pdf}
+\caption[Native-resolution reconstruction.]{Native $512\times512$ reconstruction from 60 fan-beam views, displayed in HU. In this example, PaDIS restores more anatomical detail than FDK or CP.}
+\label{fig:results-512-ct}
+\end{figure}
+
+\section{Ablations}
+
+\subsection{Patch Size}
+
+Our patch-size analysis in \autoref{tab:patch-size} did not show a simple small-patch advantage. The $96\times96$ model achieved $34.26\,\mathrm{dB}$, almost identical in mean PSNR to the $34.25\,\mathrm{dB}$ whole-image result, whereas $32\times32$ patches performed worst. Very small $8\times8$ patches recovered much of the lost performance, so patch area alone cannot explain the non-monotonic trend. The extended visual comparison in \autoref{fig:results-patch-size} suggests that the larger patches preserve fine anatomy more consistently. As the non-default patch models inherited the $P=56$ reconstruction setting rather than being tuned separately, these rows should not be interpreted as model-specific optima.
+
+\begin{table}[htbp]
+\centering
+\caption[Patch-size ablation.]{VE-DPS patch-size ablation using 20 views over $360^\circ$. Unmarked rows use PaDIS.}\label{tab:patch-size}
+\small
+\normalsize
+\setlength{\tabcolsep}{2pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule[1.1pt]
+\multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{1}{c}{\bfseries Patch size} & \multicolumn{4}{c}{\bfseries 20-View 360 Degrees} \\
+\cmidrule(lr){3-6}
+ &  & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+\midrule
+\textbf{Paper} & $P=256$ (Whole-Image) & $33.97^{+0.67}_{-0.62}$ & $0.825^{+0.020}_{-0.022}$ & $0.0137^{+0.0010}_{-0.0010}$ & $0.0373^{+0.0026}_{-0.0027}$ \\
+\addlinespace[2pt]\midrule
+\textbf{Public-compatible} & $P=8$ & $31.66^{+0.69}_{-0.76}$ & $0.801^{+0.019}_{-0.020}$ & $0.0162^{+0.0016}_{-0.0014}$ & $0.0169^{+0.0022}_{-0.0020}$ \\
+ & $P=16$ & $30.66^{+0.68}_{-0.69}$ & $0.746^{+0.029}_{-0.031}$ & $0.0189^{+0.0018}_{-0.0016}$ & $0.0170^{+0.0025}_{-0.0023}$ \\
+ & $P=32$ & $28.97^{+0.82}_{-0.84}$ & $0.676^{+0.043}_{-0.045}$ & $0.0239^{+0.0028}_{-0.0028}$ & $0.0202^{+0.0031}_{-0.0028}$ \\
+ & $P=56$ & $32.49^{+1.10}_{-1.08}$ & $0.805^{+0.040}_{-0.044}$ & $0.0156^{+0.0021}_{-0.0022}$ & $0.0187^{+0.0025}_{-0.0024}$ \\
+ & $P=96$ & $33.89^{+0.70}_{-0.66}$ & $0.853^{+0.019}_{-0.021}$ & $0.0128^{+0.0011}_{-0.0010}$ & $0.0216^{+0.0016}_{-0.0016}$ \\
+\addlinespace[2pt]\midrule
+\textbf{LION-physics} & $P=8$ & $31.55^{+0.53}_{-0.56}$ & $0.803^{+0.019}_{-0.021}$ & $0.0159^{+0.0013}_{-0.0011}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & $P=16$ & $29.97^{+0.63}_{-0.62}$ & $0.723^{+0.031}_{-0.037}$ & $0.0203^{+0.0018}_{-0.0016}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & $P=32$ & $28.40^{+0.73}_{-0.69}$ & $0.663^{+0.040}_{-0.045}$ & $0.0251^{+0.0028}_{-0.0025}$ & $0.0014^{+0.0001}_{-0.0001}$ \\
+ & $P=56$ & $32.82^{+1.03}_{-1.01}$ & $0.816^{+0.045}_{-0.046}$ & $0.0148^{+0.0024}_{-0.0023}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & $P=96$ & $\mathbf{34.26^{+0.67}_{-0.68}}$ & $\mathbf{0.869^{+0.020}_{-0.023}}$ & $\mathbf{0.0118^{+0.0010}_{-0.0010}}$ & $0.0014^{+0.0001}_{-0.0001}$ \\
+ & $P=256$ (Whole-Image) & $34.25^{+0.71}_{-0.66}$ & $0.865^{+0.021}_{-0.025}$ & $\mathbf{0.0118^{+0.0011}_{-0.0011}}$ & $0.0014^{+0.0001}_{-0.0001}$ \\
+\bottomrule[1.1pt]
+\end{tabular}
+}
+\end{table}
+
+\subsection{Training-Set Size}
+
+Training on all processed slices slightly improved the whole-image LION-physics result but reduced PaDIS PSNR from $32.82$ to $31.68\,\mathrm{dB}$ (\autoref{tab:dataset-size}). The qualitative difference is subtle in \autoref{fig:results-dataset-size}. Neither full-data output is visibly superior. Because every model received a fixed wall-clock budget, the full-data models completed fewer passes over each image. This is therefore an equal-compute comparison, not evidence that additional data are intrinsically harmful to PaDIS.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth]{figureA6_dataset_size.pdf}
+\caption[Dataset-size ablation.]{Effect of training-set size on one 20-view reconstruction, shown in NI. Rows compare PaDIS and whole-image VE-DPS. Columns use the default four-slice-per-patient subset, all processed LIDC-IDRI slices, and ground truth.}
+\label{fig:results-dataset-size}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption[Dataset-size ablation.]{VE-DPS dataset-size ablation using 20 views over $360^\circ$.}\label{tab:dataset-size}
+\small
+\normalsize
+\setlength{\tabcolsep}{2pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lllcccc}
+\toprule[1.1pt]
+\multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Ablation settings} & \multicolumn{4}{c}{\bfseries 20-View 360 Degrees} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-7}
+ & \textbf{Dataset} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+\midrule
+\textbf{Paper} & Default & Whole-Image & $33.97^{+0.69}_{-0.64}$ & $0.825^{+0.021}_{-0.023}$ & $0.0137^{+0.0009}_{-0.0011}$ & $0.0373^{+0.0026}_{-0.0028}$ \\
+ & Full & Whole-Image & $33.95^{+0.79}_{-0.76}$ & $0.815^{+0.025}_{-0.029}$ & $0.0141^{+0.0013}_{-0.0014}$ & $0.0389^{+0.0069}_{-0.0056}$ \\
+\addlinespace[2pt]\midrule
+\textbf{Public-compatible} & Default & PaDIS & $32.49^{+1.12}_{-1.08}$ & $0.805^{+0.040}_{-0.045}$ & $0.0156^{+0.0023}_{-0.0022}$ & $0.0187^{+0.0026}_{-0.0024}$ \\
+ & Full & PaDIS & $31.53^{+1.06}_{-1.04}$ & $0.774^{+0.041}_{-0.046}$ & $0.0175^{+0.0024}_{-0.0021}$ & $0.0202^{+0.0022}_{-0.0021}$ \\
+\addlinespace[2pt]\midrule
+\textbf{LION-physics} & Default & Whole-Image & $34.25^{+0.71}_{-0.64}$ & $0.865^{+0.021}_{-0.024}$ & $0.0118^{+0.0012}_{-0.0011}$ & $0.0014^{+0.0001}_{-0.0001}$ \\
+ & Default & PaDIS & $32.82^{+1.08}_{-1.12}$ & $0.816^{+0.042}_{-0.047}$ & $0.0148^{+0.0026}_{-0.0021}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & Full & Whole-Image & $\mathbf{34.38^{+0.65}_{-0.60}}$ & $\mathbf{0.867^{+0.020}_{-0.024}}$ & $\mathbf{0.0117^{+0.0011}_{-0.0010}}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & Full & PaDIS & $31.68^{+0.97}_{-1.01}$ & $0.777^{+0.044}_{-0.047}$ & $0.0170^{+0.0026}_{-0.0024}$ & $0.0017^{+0.0007}_{-0.0005}$ \\
+\bottomrule[1.1pt]
+\end{tabular}
+}
+\end{table}
+
+\subsection{Position, Initialisation and Schedule}
+
+Replacing FDK initialisation with Gaussian noise changed LION-physics PSNR by at most $0.10\,\mathrm{dB}$ within matched geometric-schedule rows (\autoref{tab:position}), while removing positional channels reduced PSNR by $0.30\,\mathrm{dB}$ from FDK and $0.40\,\mathrm{dB}$ from noise. The reconstructions in \autoref{fig:results-position-encoding} are nevertheless visually similar. Positional channels therefore gave only a small improvement in these measurement-conditioned reconstructions, although the no-position model inherited the default model's inference setting and this experiment does not test position-free unconditional generation. In contrast, replacing the geometric schedule with the public repository's EDM-style default reduced the position-enabled LION-physics result from $32.82$ to $31.53\,\mathrm{dB}$ with FDK initialisation.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figureA7_position_encoding.pdf}
+\caption[Position and initialisation ablation.]{Position and initialisation ablation for two 20-view reconstructions in NI. Columns compare models without and with positional channels, each initialised from noise or FDK, followed by ground truth.}
+\label{fig:results-position-encoding}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption[Position, initialisation and schedule ablations.]{PaDIS position, initialisation and noise-schedule ablations using 20 views over $360^\circ$.}\label{tab:position}
+\small
+\normalsize
+\setlength{\tabcolsep}{2pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llllcccc}
+\toprule[1.1pt]
+\multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{3}{c}{\bfseries Ablation settings} & \multicolumn{4}{c}{\bfseries 20-View 360 Degrees} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-8}
+ & \textbf{Position} & \textbf{Init.} & \textbf{Schedule} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+\midrule
+\textbf{Public-compatible} & \multicolumn{1}{c}{$\times$} & FDK & Geometric & $32.50^{+1.05}_{-1.12}$ & $0.805^{+0.036}_{-0.042}$ & $0.0156^{+0.0022}_{-0.0020}$ & $0.0185^{+0.0024}_{-0.0022}$ \\
+ & \multicolumn{1}{c}{$\times$} & Noise & Geometric & $32.47^{+1.02}_{-1.04}$ & $0.791^{+0.041}_{-0.046}$ & $0.0159^{+0.0021}_{-0.0019}$ & $0.0201^{+0.0036}_{-0.0031}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & FDK & EDM & $31.56^{+1.06}_{-1.07}$ & $0.777^{+0.041}_{-0.047}$ & $0.0174^{+0.0024}_{-0.0024}$ & $0.0178^{+0.0014}_{-0.0015}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & Noise & EDM & $31.55^{+1.09}_{-1.12}$ & $0.769^{+0.044}_{-0.052}$ & $0.0176^{+0.0026}_{-0.0023}$ & $0.0186^{+0.0019}_{-0.0017}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & FDK & Geometric & $32.49^{+1.10}_{-1.07}$ & $0.805^{+0.040}_{-0.044}$ & $0.0156^{+0.0022}_{-0.0021}$ & $0.0187^{+0.0026}_{-0.0024}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & Noise & Geometric & $32.46^{+1.09}_{-1.17}$ & $0.792^{+0.041}_{-0.043}$ & $0.0160^{+0.0024}_{-0.0021}$ & $0.0201^{+0.0034}_{-0.0031}$ \\
+\addlinespace[2pt]\midrule
+\textbf{LION-physics} & \multicolumn{1}{c}{$\times$} & FDK & Geometric & $32.52^{+0.90}_{-0.93}$ & $0.808^{+0.040}_{-0.044}$ & $0.0152^{+0.0023}_{-0.0020}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & \multicolumn{1}{c}{$\times$} & Noise & Geometric & $32.42^{+0.85}_{-0.91}$ & $0.805^{+0.040}_{-0.044}$ & $0.0153^{+0.0022}_{-0.0020}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & FDK & EDM & $31.53^{+0.84}_{-0.97}$ & $0.779^{+0.042}_{-0.049}$ & $0.0171^{+0.0026}_{-0.0024}$ & $0.0015^{+0.0001}_{-0.0001}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & Noise & EDM & $31.61^{+0.95}_{-0.93}$ & $0.781^{+0.046}_{-0.050}$ & $0.0169^{+0.0026}_{-0.0025}$ & $0.0015^{+0.0001}_{-0.0001}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & FDK & Geometric & $\mathbf{32.82^{+0.99}_{-1.08}}$ & $\mathbf{0.817^{+0.041}_{-0.050}}$ & $\mathbf{0.0148^{+0.0027}_{-0.0022}}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+ & \multicolumn{1}{c}{$\checkmark$} & Noise & Geometric & $\mathbf{32.82^{+0.99}_{-1.08}}$ & $0.816^{+0.042}_{-0.050}$ & $\mathbf{0.0148^{+0.0025}_{-0.0022}}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ \\
+\bottomrule[1.1pt]
+\end{tabular}
+}
+\end{table}
+
+\subsection{Sampler Dependence}
+
+Sampler choice changed the ranking of the learned priors. Under their validation-selected LION-physics settings at 20 views, VE-DDNM favoured PaDIS by $2.30\,\mathrm{dB}$, whilst VE-DPS and Langevin favoured the whole-image prior by $1.43$ and $1.64\,\mathrm{dB}$ respectively (\autoref{tab:main-quality}). Predictor-corrector gave similar PSNR for both priors but substantially higher SSIM for PaDIS. The comparison in \autoref{fig:results-sampling-methods} shows that each method produced plausible low-frequency anatomy on the selected slice, even where quantitative performance differed. As we selected settings per prior and sampler, these comparisons show the best observed configurations rather than isolating the patch score alone.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\textwidth]{figureA8_sampling_methods.pdf}
+\caption[Sampler comparison.]{Sampler comparison for one 20-view reconstruction in NI. Rows use PaDIS and whole-image priors. Columns compare Langevin, predictor-corrector, VE-DDNM and VE-DPS against ground truth.}
+\label{fig:results-sampling-methods}
+\end{figure}
+
+\section{Runtime and Unconditional Generation}
+
+We recorded approximately two minutes per slice for PaDIS-DPS, $24\%$ less than whole-image VE-DPS, while fixed patch averaging and stitching took about $24$ minutes (\autoref{tab:runtime}). These jobs could run concurrently and were not isolated timing benchmarks. Among the four untuned samples per method in \autoref{fig:results-generation}, random PaDIS partitions avoided the rectangular discontinuities visible under fixed stitching, although this small sample is insufficient to rank distributional quality.
+
+\begin{table}[htbp]
+\centering
+\caption[Logged reconstruction time per slice.]{Mean 20-view wall time per slice parsed from the pipeline logs. Jobs could share a GPU, so these values are not isolated serial benchmarks.}\label{tab:runtime}
+\small
+\begin{tabular}{llr}
+\toprule[1.1pt]
+\multicolumn{1}{l}{\bfseries Implementation} & \multicolumn{1}{l}{\bfseries Reconstruction method} & \multicolumn{1}{r}{\bfseries Mean time per slice} \\
+\midrule
+\textbf{LION-physics} & Baseline & \textbf{4.71 s} \\
+ & CP & 8.13 s \\
+ & Predictor--corrector & 14.11 s \\
+ & PnP--ADMM & 26.63 s \\
+ & Langevin & 51.49 s \\
+ & VE--DDNM & 62.08 s \\
+ & PaDIS--DPS & 118.85 s \\
+ & VE--DPS (Whole-Image) & 156.44 s \\
+ & Patch stitch & 1,450.73 s (24.18 min) \\
+ & Patch average & 1,468.76 s (24.48 min) \\
+\midrule
+\textbf{Paper} & Predictor--corrector & 14.16 s \\
+ & Langevin & 56.42 s \\
+ & VE--DDNM & 61.34 s \\
+ & PaDIS--DPS & 120.45 s \\
+ & VE--DPS (Whole-Image) & 156.89 s \\
+\midrule
+\textbf{Public-compatible} & Predictor--corrector & 14.02 s \\
+ & Langevin & 56.55 s \\
+ & VE--DDNM & 58.54 s \\
+ & PaDIS--DPS & 119.22 s \\
+ & Patch stitch & 1,461.08 s (24.35 min) \\
+ & Patch average & 1,468.75 s (24.48 min) \\
+\bottomrule[1.1pt]
+\end{tabular}
+\end{table}
+
+% Qualitative result panels.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figure4_generation.pdf}
+\caption[Unconditional generation comparison.]{Unconditional samples from whole-image, fixed patch-stitching, fixed patch-averaging and PaDIS priors, shown in NI. Columns are independent samples. Random PaDIS partitions avoid the fixed rectangular discontinuities visible under stitching in these examples.}
+\label{fig:results-generation}
+\end{figure}

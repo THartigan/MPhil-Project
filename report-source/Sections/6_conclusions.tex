@@ -1,0 +1,10 @@
+\ifpdf
+    \graphicspath{{Sections/6_conclusions_figs/Raster/}{Sections/6_conclusions_figs/PDF/}{Sections/6_conclusions_figs/}}
+\else
+    \graphicspath{{Sections/6_conclusions_figs/Vector/}{Sections/6_conclusions_figs/}}
+\fi
+
+\chapter{Conclusion}
+\label{sec:conclusion}
+
+In this work, we reproduced the PaDIS pipeline in LION and showed that patch-trained diffusion priors can support accurate, data-consistent fan-beam CT reconstruction, including at $512\times512$ resolution, but did not reproduce the stronger claim that PaDIS consistently outperforms whole-image diffusion. Under VE-DPS, we found the opposite ranking, while PaDIS became strongest with VE-DDNM at 20 and 60 views. Patch size and sampler choice mattered more than positional encoding or the nominal number of training slices under the fixed compute budget. PaDIS is therefore best understood as a practical high-resolution prior whose value depends on the reconstruction method, rather than a universally superior substitute for whole-image diffusion. This work also demonstrates why complete geometry, training, tuning and executable algorithm specifications are essential for credible inverse-problem research.
