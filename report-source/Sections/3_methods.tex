@@ -69,7 +69,7 @@ Both models use the four-slice split, Adam at $10^{-4}$ for 100 epochs, batch si
 \section{Reconstructor Implementation}
 \label{sec:methods-reconstructor-implementation}
 
-The original PaDIS paper and released code specify some methods differently (\secref{sec:discussion-reproducibility}) \cite{hu_learning_2024,hu_jasonhu4padis_2026-1}, so we choose to implement both versions. Paper-style follows the written algorithms, Public-compatible follows the released code, and LION-physics is our operator-normalised extension. The reproduction tracks exist only where the original PaDIS work gives enough detail, whereas LION-physics covers all methods. \autoref{tab:methods_by_implementation} summarises these combinations, with differences in \secref{subsec:public-compatible-implementation} and \secref{subsec:lion-physics-implementations}.
+The original PaDIS paper and released code specify some methods differently (\secref{sec:discussion-reproducibility}) \cite{hu_learning_2024,hu_jasonhu4padis_2026-1}, so we choose to implement both versions. Paper-Faithful follows the written algorithms, Repo-Faithful follows the released code, and LION-Physical is our operator-normalised extension. The reproduction tracks exist only where the original PaDIS work gives enough detail, whereas LION-Physical covers all methods. \autoref{tab:methods_by_implementation} summarises these combinations, with differences in \secref{subsec:repo-faithful-implementation} and \secref{subsec:lion-physical-implementations}.
 
 \begin{table}[ht]
   \centering
@@ -77,7 +77,7 @@ The original PaDIS paper and released code specify some methods differently (\se
   \label{tab:methods_by_implementation}
   \begin{tabular}{lccc}
   \hline
-  \textbf{Method} & \textbf{Paper-style} & \textbf{Public-compatible} & \textbf{LION-physics} \\
+  \textbf{Method} & \textbf{Paper-Faithful} & \textbf{Repo-Faithful} & \textbf{LION-Physical} \\
   \hline
   Baseline FDK              & --             & --             & $\checkmark$ \\
   Chambolle--Pock TV        & --             & --             & $\checkmark^*$ \\
@@ -93,23 +93,23 @@ The original PaDIS paper and released code specify some methods differently (\se
   \end{tabular}
 \end{table}
 
-All tracks use the same LIDC-IDRI images, denoisers and LION measurements. Paper-style therefore refers to the equations and sampling choices in the original PaDIS paper, rather than exact reproduction of its AAPM parallel-beam experiments. We evaluate LION-physics as an extension without claiming direct reproduction of Hu et al.'s algorithms, using hyperparameters re-tuned for the LION operators.
+All tracks use the same LIDC-IDRI images, denoisers and LION measurements. Paper-Faithful therefore refers to the equations and sampling choices in the original PaDIS paper, rather than exact reproduction of its AAPM parallel-beam experiments. We evaluate LION-Physical as an extension without claiming direct reproduction of Hu et al.'s algorithms, using hyperparameters re-tuned for the LION operators.
 
-Throughout, an outer step means moving to the next noise level, while an inner step repeats the sampler update at the current noise level. Unless stated otherwise, diffusion reconstructions use 100 geometrically spaced outer levels from $\sigma_{\max}=10$ to $\sigma_{\min}=0.002$, with 10 inner updates at each level. The 8-view experiments instead use $\sigma_{\min}=0.003$. The schedule ablation changes only the spacing of the outer levels from geometric to EDM-style. Predictor-corrector is an exception because each adjacent pair receives one predictor and one corrector update. Paper-style and LION-physics VE-DDNM instead use 1000 outer levels with one update per level, while Public-compatible VE-DDNM retains the released code's 100 outer levels with 10 inner updates.
+Throughout, an outer step means moving to the next noise level, while an inner step repeats the sampler update at the current noise level. Unless stated otherwise, diffusion reconstructions use 100 geometrically spaced outer levels from $\sigma_{\max}=10$ to $\sigma_{\min}=0.002$, with 10 inner updates at each level. The 8-view experiments instead use $\sigma_{\min}=0.003$. The schedule ablation changes only the spacing of the outer levels from geometric to EDM-style. Predictor-corrector is an exception because each adjacent pair receives one predictor and one corrector update. Paper-Faithful and LION-Physical VE-DDNM instead use 1000 outer levels with one update per level, while Repo-Faithful VE-DDNM retains the released code's 100 outer levels with 10 inner updates.
 
 For the analytic baseline, we apply LION's Hann-filtered FDK with frequency scaling 0.3 \cite{feldkamp_practical_1984}. Hu et al. used ADMM-TV as their iterative baseline \cite{hu_learning_2024}. We retain its isotropic TV objective \cite{rudin_nonlinear_1992} but use LION's CP implementation from \secref{subsec:iterative_reconstruction_denoising_priors} \cite{chambolle_first-order_2011}. Validation selected $\lambda=0.001$ and 1000 iterations. We clipped outputs to $[0,1]$ without non-negativity and therefore report CP rather than ADMM-TV. We keep PnP-ADMM separate, using $\eta=3\times10^{-5}$, 60 outer iterations, at most 50 conjugate-gradient iterations and tolerance $10^{-7}$, and clip its states and outputs to $[0,1]$.
 
-\subsection{Public-Compatible Implementations}
-\label{subsec:public-compatible-implementation}
+\subsection{Repo-Faithful Implementations}
+\label{subsec:repo-faithful-implementation}
 We implemented these methods to match the publicly available codebase, which differs from the descriptions in the original PaDIS paper in several important ways \cite{hu_learning_2024,hu_jasonhu4padis_2026-1}. Its DPS implementation differentiates the norm of the residual and begins from FDK, whilst predictor-corrector evaluates the denoiser at $\sigma_k$, divides the score by $\sigma_{k+1}^2$ and reuses the predictor patch layout. VE-DDNM uses $100$ noise levels with $10$ updates at each, rather than $1000$ separate levels.
 
-The Public-compatible track retains these rules, clipping and patch randomisation with fixed scales for LION geometry. Final experiments use the geometric schedule from the original PaDIS paper, with the public EDM-style schedule as an ablation. Translation validation used an adapted version of the released code in the companion \texttt{PaDIS} directory with the same slices, checkpoint and geometry. Across three matched DPS reconstructions, target means were $33.12$ versus $33.16\,\mathrm{dB}$ PSNR and $0.836$ versus $0.834$ SSIM, while cross-implementation SSIM was $0.996$. The remaining difference was within sampler variation, and patch layouts and intermediate states were used to check other public helpers.
+The Repo-Faithful track retains these rules, clipping and patch randomisation with fixed scales for LION geometry. Final experiments use the geometric schedule from the original PaDIS paper, with the public EDM-style schedule as an ablation. Translation validation used an adapted version of the released code in the companion \texttt{PaDIS} directory with the same slices, checkpoint and geometry. Across three matched DPS reconstructions, target means were $33.12$ versus $33.16\,\mathrm{dB}$ PSNR and $0.836$ versus $0.834$ SSIM, while cross-implementation SSIM was $0.996$. The remaining difference was within sampler variation, and patch layouts and intermediate states were used to check other public helpers.
 
-\subsection{LION-physics Implementations}
-\label{subsec:lion-physics-implementations}
-Our LION-physics extension to the original PaDIS work removes these fixed scales. Following \autoref{eq:scaled_data_consistency_update}, the LION-physics update divides the squared-residual gradient by $L_F=\lVert F\rVert_2^2$, where $F$ maps the normalised image to its sinogram and its norm is estimated with 20 power iterations and tolerance $10^{-4}$ \cite{golub_matrix_2012,beck_fast_2009}. This makes the data-consistency coefficient more comparable between geometries, but does not guarantee sampler convergence.
+\subsection{LION-Physical Implementations}
+\label{subsec:lion-physical-implementations}
+Our LION-Physical extension to the original PaDIS work removes these fixed scales. Following \autoref{eq:scaled_data_consistency_update}, the LION-Physical update divides the squared-residual gradient by $L_F=\lVert F\rVert_2^2$, where $F$ maps the normalised image to its sinogram and its norm is estimated with 20 power iterations and tolerance $10^{-4}$ \cite{golub_matrix_2012,beck_fast_2009}. This makes the data-consistency coefficient more comparable between geometries, but does not guarantee sampler convergence.
 
-These implementations otherwise use the geometric schedule from the original PaDIS paper, with predictor-corrector retaining the paper-style noise-level and patch-layout choices. Every VE-DDNM track clips its FDK approximate-inverse terms to prevent non-finite values, while paper-style and LION-physics also clip the corrected state. The selected LION-physics patch VE-DDNM further uses noise scale 0.5, and operator normalisation applies only to diffusion data updates.
+These implementations otherwise use the geometric schedule from the original PaDIS paper, with predictor-corrector retaining the Paper-Faithful track's noise-level and patch-layout choices. Every VE-DDNM track clips its FDK approximate-inverse terms to prevent non-finite values, while Paper-Faithful and LION-Physical also clip the corrected state. The selected LION-Physical patch VE-DDNM further uses noise scale 0.5, and operator normalisation applies only to diffusion data updates.
 
 Patch averaging and stitching use fixed layouts with an eight-pixel overlap. Averaging takes the mean of all predictions covering each pixel, whilst stitching allows later patches to replace earlier values in overlaps. Both use DPS, but unlike PaDIS they do not repeatedly redraw shifted patch partitions. They are experimental controls rather than implementations of previously published algorithms: overlapping-patch diffusion provides context for averaging local denoisers \cite{ozdenizci_restoring_2023}, while prior tile-based analysis motivates checking fixed-boundary and shift effects \cite{rumberger_how_2021}.
 
@@ -118,9 +118,9 @@ Hyperparameter selection used only validation data. Finite runs were ranked by m
 
 \section{Experiments}
 
-The primary comparison uses noise-free sinograms from 8 and 20 uniformly spaced views over $360^\circ$ at $256\times256$. This comparison includes the combinations in \autoref{tab:methods_by_implementation}, which produce the results in \autoref{tab:main-quality}. Paper-style and Public-compatible test the central PaDIS claim under two readings of the combined specification, while LION-physics evaluates our extension on the same images, priors and measurements.
+The primary comparison uses noise-free sinograms from 8 and 20 uniformly spaced views over $360^\circ$ at $256\times256$. This comparison includes the combinations in \autoref{tab:methods_by_implementation}, which produce the results in \autoref{tab:main-quality}. Paper-Faithful and Repo-Faithful test the central PaDIS claim under two readings of the combined specification, while LION-Physical evaluates our extension on the same images, priors and measurements.
 
-Three extensions test transfer. Selected methods are evaluated with 60 full-angle views and with 20 views over a $120^\circ$ arc. The latter retains the legacy key \texttt{ct\_fanbeam\_180}, but is a limited-angle stress test rather than the 180-view experiment in the original PaDIS paper. Native-resolution experiments use 60 full-angle views on a $512\times512$ grid and compare FDK, CP-TV, public-compatible PaDIS-DPS and LION-physics PaDIS-DPS. We did not train a whole-image model at this resolution.
+Three extensions test transfer. Selected methods are evaluated with 60 full-angle views and with 20 views over a $120^\circ$ arc. The latter retains the legacy key \texttt{ct\_fanbeam\_180}, but is a limited-angle stress test rather than the 180-view experiment in the original PaDIS paper. Native-resolution experiments use 60 full-angle views on a $512\times512$ grid and compare FDK, CP-TV, Repo-Faithful PaDIS-DPS and LION-Physical PaDIS-DPS. We did not train a whole-image model at this resolution.
 
 All quantitative ablations use the 20-view full-angle problem. The patch-size, dataset-size and positional-encoding analyses revisit questions examined by Hu et al. \cite{hu_learning_2024}, while initialisation and schedule comparisons resolve paper--code differences. Patch sizes $P\in\{8,16,32,56,96\}$ are compared with whole-image diffusion, and the four-slice regime with all processed slices for both priors. The position analysis crosses coordinate channels with FDK or Gaussian initialisation, while the schedule ablation compares the two outer-level spacings. Sampler comparisons apply Langevin, predictor-corrector, VE-DDNM and VE-DPS to patch and, where implemented, whole-image priors.
 
@@ -150,12 +150,12 @@ Low RSR shows that a reconstruction explains the simulated measurements. A low R
 
 We report image-level means and asymmetric central 95\% confidence intervals from 2000 deterministic bootstrap resamples using seed 33 \cite{efron_automatic_2020}, bootstrapping images rather than training runs to capture slice variation but not retraining uncertainty. For figures, we clip normalised images to $[0,1]$, and abbreviate ``Normalised Intensity'' to NI. HU panels use \autoref{eq:hounsfield_units}. We clip each row to the 15th and 95th percentiles of non-background ground-truth pixels, defined by normalised intensity above 0.02, and apply the same limits to every reconstruction and target in that row to prevent method-dependent contrast adjustment. Colour bars report these limits. The 50-mm scale bars use the configured 300-mm field of view rather than patient-native DICOM spacing. We assess unconditional generations qualitatively because they have no paired target.
 \section{Compute and Reproducibility}
-For final training and reconstruction, we used a Google-hosted NVIDIA RTX PRO 6000 GPU, while fixed-validation tuning also used a local NVIDIA GTX 1070. Using seed 33 throughout, we developed the pipeline independently in LION, used the released repository only to check the Public-compatible track and selected checkpoints before testing. Weights \& Biases records training, and we retain artefacts on persistent cloud storage while providing reproduction scripts and instructions in \texttt{scripts/paper\_scripts/PaDIS}.
+For final training and reconstruction, we used a Google-hosted NVIDIA RTX PRO 6000 GPU, while fixed-validation tuning also used a local NVIDIA GTX 1070. Using seed 33 throughout, we developed the pipeline independently in LION, used the released repository only to check the Repo-Faithful track and selected checkpoints before testing. Weights \& Biases records training, and we retain artefacts on persistent cloud storage while providing reproduction scripts and instructions in \texttt{scripts/paper\_scripts/PaDIS}.
 
-% - Implemented in LION - Produced three implementation tracks: Explicit paper
-% implementation, public-repo matching setup, and one which uses correct operator
+% - Implemented in LION - Produced three implementation tracks: Paper-faithful
+% implementation, repo-faithful matching setup, and one which uses correct operator
 % normalisations to increase cross-problem reliability, as described in
-% \ref{subsec:lion-physics}. - Created LION-physics implementations for all
-% experiments, but only paper and public-repo matching implementations for those
+% \ref{subsec:lion-physical-implementations}. - Created LION-Physical implementations for all
+% experiments, but only paper-faithful and repo-faithful implementations for those
 % which were actually described in sufficient detail for reproduction in those
 % respective soruces. This is summarised in \autoref{tab:implemented-methods}.

@@ -13,13 +13,13 @@ We retained PaDIS training and patch-score construction while moving from AAPM p
 
 \subsection{Findings that Transferred}
 
-Hu et al. reported PaDIS PSNRs of $33.57\,\mathrm{dB}$ at 20 views and $29.48\,\mathrm{dB}$ at 8 views \cite{hu_learning_2024}; our paper-style track reached $32.71$ and $27.15\,\mathrm{dB}$. Despite changed data and geometry, the 20-view result is within $0.86\,\mathrm{dB}$, while the 8-view result substantially improves over FDK and CP-TV. PaDIS also generated coherent whole CT slices from patches, whereas fixed stitching and averaging produced less credible global anatomy, supporting randomly shifted partitions.
+Hu et al. reported PaDIS PSNRs of $33.57\,\mathrm{dB}$ at 20 views and $29.48\,\mathrm{dB}$ at 8 views \cite{hu_learning_2024}; our Paper-Faithful track reached $32.71$ and $27.15\,\mathrm{dB}$. Despite changed data and geometry, the 20-view result is within $0.86\,\mathrm{dB}$, while the 8-view result substantially improves over FDK and CP-TV. PaDIS also generated coherent whole CT slices from patches, whereas fixed stitching and averaging produced less credible global anatomy, supporting randomly shifted partitions.
 
 At $512\times512$, PaDIS obtained $40.08\,\mathrm{dB}$ PSNR and $0.960$ SSIM without a whole-image model, reproducing the high-resolution argument \cite{hu_learning_2024}. At 256 resolution, its logged wall time was $24\%$ below whole-image VE-DPS after half the training, although concurrent jobs prevent an isolated benchmark. PaDIS therefore remains useful where whole-image memory or training cost is prohibitive.
 
 \subsection{Findings that Did Not Transfer}
 
-We did not reproduce the claim that PaDIS consistently outperforms whole-image diffusion \cite{hu_learning_2024}. In the paper-style track, whole-image diffusion exceeded PaDIS-DPS by $1.26\,\mathrm{dB}$ at 20 views and $1.95\,\mathrm{dB}$ at 8 views. LION-physics showed the same reversal under VE-DPS, also visible in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional}.
+We did not reproduce the claim that PaDIS consistently outperforms whole-image diffusion \cite{hu_learning_2024}. In the Paper-Faithful track, whole-image diffusion exceeded PaDIS-DPS by $1.26\,\mathrm{dB}$ at 20 views and $1.95\,\mathrm{dB}$ at 8 views. LION-Physical showed the same reversal under VE-DPS, also visible in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional}.
 
 The whole-image prior was not always better: tuned PaDIS VE-DDNM achieved the best 20- and 60-view PSNRs and beat its whole-image counterpart by $2.30\,\mathrm{dB}$ at 20 views. Langevin and VE-DPS favoured whole-image, while predictor-corrector rankings depended on the metric. Because settings were validation-selected per prior and sampler, these comparisons do not isolate architecture, but show that PaDIS performance depends on how its patch score is used. PaDIS is flexible and sometimes stronger, but not universally superior.
 
@@ -40,17 +40,17 @@ We treated the released code as part of the specification of the original PaDIS 
 
 The released code resolves some details, but differs from the algorithms in the original PaDIS paper \cite{hu_learning_2024,hu_jasonhu4padis_2026-1}. Its main DPS path starts from filtered back-projection rather than the Gaussian state in Algorithm 1, differentiates the residual norm rather than its square, and defaults to an EDM-style schedule. Predictor-corrector changes the corrector noise level and reuses its patch layout. VE-DDNM uses 100 noise levels with 10 inner updates rather than 1000 separate levels. We also restored several comparison APIs before the published methods could run. These ambiguities within the combined specification can materially change the reconstruction.
 
-We found agreement within sampler variation when comparing against the adapted public-code fork on the same LION geometry. This agreement validates the Public-compatible implementation, but not the unspecified ODL geometry in the original PaDIS paper. Publishing geometry, data indices, configurations and checkpoints would reduce this ambiguity.
+We found agreement within sampler variation when comparing against the adapted public-code fork on the same LION geometry. This agreement validates the Repo-Faithful implementation, but not the unspecified ODL geometry in the original PaDIS paper. Publishing geometry, data indices, configurations and checkpoints would reduce this ambiguity.
 
 \section{Extensions to the Original Work}
 
-We use Paper-style and Public-compatible as two readings of the combined specification, while LION-physics is an extension introduced here that replaces geometry-specific calibration with an operator-derived scale and whose results we use to assess transfer and stabilisation, not direct reproduction of Hu et al.'s algorithms.
+We use Paper-Faithful and Repo-Faithful as two readings of the combined specification, while LION-Physical is an extension introduced here that replaces geometry-specific calibration with an operator-derived scale and whose results we use to assess transfer and stabilisation, not direct reproduction of Hu et al.'s algorithms.
 
 \subsection{Operator-Normalised Data Consistency}
 
-The LION-physics DPS rows reached relative sinogram residuals near $10^{-3}$, over an order of magnitude below many paper-style and public-compatible results. This is important because diffusion models can otherwise produce plausible images which are not well supported by the measurements. In the limited-angle experiment, whole-image VE-DPS gave the best PSNR and SSIM, whilst PaDIS-DPS gave the smallest residual. There is therefore a trade-off between similarity to this particular held-out target and strict agreement with the information which was measured.
+The LION-Physical DPS rows reached relative sinogram residuals near $10^{-3}$, over an order of magnitude below many Paper-Faithful and Repo-Faithful results. This is important because diffusion models can otherwise produce plausible images which are not well supported by the measurements. In the limited-angle experiment, whole-image VE-DPS gave the best PSNR and SSIM, whilst PaDIS-DPS gave the smallest residual. There is therefore a trade-off between similarity to this particular held-out target and strict agreement with the information which was measured.
 
-The public-compatible fan-beam updates required calibrated gradient scales of $0.0405$ and $0.1022$. Replacing these with $\lVert F\rVert_2^2$ normalisation still gave high-quality results across each angular setting. These constants therefore correct for a particular implementation, rather than defining PaDIS itself. Operator normalisation is a more reproducible choice because it remains meaningful when the geometry changes.
+The Repo-Faithful fan-beam updates required calibrated gradient scales of $0.0405$ and $0.1022$. Replacing these with $\lVert F\rVert_2^2$ normalisation still gave high-quality results across each angular setting. These constants therefore correct for a particular implementation, rather than defining PaDIS itself. Operator normalisation is a more reproducible choice because it remains meaningful when the geometry changes.
 
 \subsection{Cost of Fixed Patch Assembly}
 
