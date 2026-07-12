@@ -144,7 +144,14 @@
 \renewcommand*{\figureautorefname}{Figure}
 \renewcommand*{\tableautorefname}{Table}
 \renewcommand*{\equationautorefname}{Equation}
-\hypersetup{linktoc=all}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue,
+  anchorcolor=blue,
+  linktoc=all
+}
 
 % Section-like references use the compact Cambridge-style section symbol. The
 % starred reference prevents a nested link so that the complete reference is a
@@ -222,14 +229,3 @@
 % *****************************************************************************
 % ******************* Better enumeration my MB*************
 \usepackage{enumitem}
-
-% Keep empty citation placeholders in the source without printing empty brackets.
-% Populated citation keys continue to use the document's normal citation style.
-\let\filledcite\cite
-\renewcommand{\cite}[1]{%
-  \if\relax\detokenize{#1}\relax
-    \unskip
-  \else
-    \filledcite{#1}%
-  \fi
-}
