@@ -83,25 +83,25 @@ The original PaDIS paper and released code specify some methods differently (\se
   \hline
   \textbf{Method} & \textbf{Paper-style} & \textbf{Public-compatible} & \textbf{LION-physics} \\
   \hline
-  Baseline FDK              & --             & --             & \(\checkmark\) \\
-  Chambolle--Pock TV        & --             & --             & \(\checkmark^*\) \\
-  PnP-ADMM                  & --             & --             & \(\checkmark\) \\
-  Whole-image diffusion     & \(\checkmark\) & --             & \(\checkmark\) \\
-  Langevin                  & \(\checkmark\) & \(\checkmark^*\) & \(\checkmark\) \\
-  Predictor-corrector       & \(\checkmark^*\) & \(\checkmark^*\) & \(\checkmark\) \\
-  VE-DDNM                   & \(\checkmark^*\) & \(\checkmark^*\) & \(\checkmark^*\) \\
-  Patch averaging           & --             & \(\checkmark^*\) & \(\checkmark\) \\
-  Patch stitching           & --             & \(\checkmark^*\) & \(\checkmark\) \\
-  PaDIS-DPS                 & \(\checkmark\) & \(\checkmark^*\) & \(\checkmark\) \\
+  Baseline FDK              & --             & --             & $\checkmark$ \\
+  Chambolle--Pock TV        & --             & --             & $\checkmark^*$ \\
+  PnP-ADMM                  & --             & --             & $\checkmark$ \\
+  Whole-image diffusion     & $\checkmark$ & --             & $\checkmark$ \\
+  Langevin                  & $\checkmark$ & $\checkmark^*$ & $\checkmark$ \\
+  Predictor-corrector       & $\checkmark^*$ & $\checkmark^*$ & $\checkmark$ \\
+  VE-DDNM                   & $\checkmark^*$ & $\checkmark^*$ & $\checkmark^*$ \\
+  Patch averaging           & --             & $\checkmark^*$ & $\checkmark$ \\
+  Patch stitching           & --             & $\checkmark^*$ & $\checkmark$ \\
+  PaDIS-DPS                 & $\checkmark$ & $\checkmark^*$ & $\checkmark$ \\
   \hline
   \end{tabular}
 \end{table}
 
 All tracks use the same LIDC-IDRI images, denoisers and LION measurements. Paper-style therefore refers to the equations and sampling choices in the original PaDIS paper, rather than exact reproduction of its AAPM parallel-beam experiments. We evaluate LION-physics as an extension without claiming direct reproduction of Hu et al.'s algorithms, using hyperparameters re-tuned for the LION operators.
 
-Throughout, an outer step means moving to the next noise level, while an inner step repeats the sampler update at the current noise level. Unless stated otherwise, diffusion reconstructions use 100 geometrically spaced outer levels from \(\sigma_{\max}=10\) to \(\sigma_{\min}=0.002\), with 10 inner updates at each level. The 8-view experiments instead use \(\sigma_{\min}=0.003\). The schedule ablation changes only the spacing of the outer levels from geometric to EDM-style. Predictor-corrector is an exception because each adjacent pair receives one predictor and one corrector update. Paper-style and LION-physics VE-DDNM instead use 1000 outer levels with one update per level, while Public-compatible VE-DDNM retains the released code's 100 outer levels with 10 inner updates.
+Throughout, an outer step means moving to the next noise level, while an inner step repeats the sampler update at the current noise level. Unless stated otherwise, diffusion reconstructions use 100 geometrically spaced outer levels from $\sigma_{\max}=10$ to $\sigma_{\min}=0.002$, with 10 inner updates at each level. The 8-view experiments instead use $\sigma_{\min}=0.003$. The schedule ablation changes only the spacing of the outer levels from geometric to EDM-style. Predictor-corrector is an exception because each adjacent pair receives one predictor and one corrector update. Paper-style and LION-physics VE-DDNM instead use 1000 outer levels with one update per level, while Public-compatible VE-DDNM retains the released code's 100 outer levels with 10 inner updates.
 
-For the analytic baseline, we apply LION's Hann-filtered FDK with frequency scaling 0.3 \cite{feldkamp_practical_1984}. Hu et al. used ADMM-TV as their iterative baseline \cite{hu_learning_2024}. We retain its isotropic TV objective \cite{rudin_nonlinear_1992} but use LION's CP implementation from \secref{subsec:iterative_reconstruction_denoising_priors} \cite{chambolle_first-order_2011}. Validation selected \(\lambda=0.001\) and 1000 iterations. We clipped outputs to \([0,1]\) without non-negativity and therefore report CP rather than ADMM-TV. We keep PnP-ADMM separate, using \(\eta=3\times10^{-5}\), 60 outer iterations, at most 50 conjugate-gradient iterations and tolerance \(10^{-7}\), and clip its states and outputs to \([0,1]\).
+For the analytic baseline, we apply LION's Hann-filtered FDK with frequency scaling 0.3 \cite{feldkamp_practical_1984}. Hu et al. used ADMM-TV as their iterative baseline \cite{hu_learning_2024}. We retain its isotropic TV objective \cite{rudin_nonlinear_1992} but use LION's CP implementation from \secref{subsec:iterative_reconstruction_denoising_priors} \cite{chambolle_first-order_2011}. Validation selected $\lambda=0.001$ and 1000 iterations. We clipped outputs to $[0,1]$ without non-negativity and therefore report CP rather than ADMM-TV. We keep PnP-ADMM separate, using $\eta=3\times10^{-5}$, 60 outer iterations, at most 50 conjugate-gradient iterations and tolerance $10^{-7}$, and clip its states and outputs to $[0,1]$.
 
 \subsection{Public-Compatible Implementations}
 \label{subsec:public-compatible-implementation}
@@ -122,19 +122,19 @@ Hyperparameter selection used only validation data. Finite runs were ranked by m
 
 \section{Experiments}
 
-The primary comparison uses noise-free sinograms from 8 and 20 uniformly spaced views over \(360^\circ\) at \(256\times256\). This comparison includes the combinations in \autoref{tab:methods_by_implementation}, which produce the results in \autoref{tab:main-quality}. Paper-style and Public-compatible test the central PaDIS claim under two readings of the combined specification, while LION-physics evaluates our extension on the same images, priors and measurements.
+The primary comparison uses noise-free sinograms from 8 and 20 uniformly spaced views over $360^\circ$ at $256\times256$. This comparison includes the combinations in \autoref{tab:methods_by_implementation}, which produce the results in \autoref{tab:main-quality}. Paper-style and Public-compatible test the central PaDIS claim under two readings of the combined specification, while LION-physics evaluates our extension on the same images, priors and measurements.
 
-Three extensions test transfer. Selected methods are evaluated with 60 full-angle views and with 20 views over a \(120^\circ\) arc. The latter retains the legacy key \texttt{ct\_fanbeam\_180}, but is a limited-angle stress test rather than the 180-view experiment in the original PaDIS paper. Native-resolution experiments use 60 full-angle views on a \(512\times512\) grid and compare FDK, CP-TV, public-compatible PaDIS-DPS and LION-physics PaDIS-DPS. We did not train a whole-image model at this resolution.
+Three extensions test transfer. Selected methods are evaluated with 60 full-angle views and with 20 views over a $120^\circ$ arc. The latter retains the legacy key \texttt{ct\_fanbeam\_180}, but is a limited-angle stress test rather than the 180-view experiment in the original PaDIS paper. Native-resolution experiments use 60 full-angle views on a $512\times512$ grid and compare FDK, CP-TV, public-compatible PaDIS-DPS and LION-physics PaDIS-DPS. We did not train a whole-image model at this resolution.
 
-All quantitative ablations use the 20-view full-angle problem. The patch-size, dataset-size and positional-encoding analyses revisit questions examined by Hu et al. \cite{hu_learning_2024}, while initialisation and schedule comparisons resolve paper--code differences. Patch sizes \(P\in\{8,16,32,56,96\}\) are compared with whole-image diffusion, and the four-slice regime with all processed slices for both priors. The position analysis crosses coordinate channels with FDK or Gaussian initialisation, while the schedule ablation compares the two outer-level spacings. Sampler comparisons apply Langevin, predictor-corrector, VE-DDNM and VE-DPS to patch and, where implemented, whole-image priors.
+All quantitative ablations use the 20-view full-angle problem. The patch-size, dataset-size and positional-encoding analyses revisit questions examined by Hu et al. \cite{hu_learning_2024}, while initialisation and schedule comparisons resolve paper--code differences. Patch sizes $P\in\{8,16,32,56,96\}$ are compared with whole-image diffusion, and the four-slice regime with all processed slices for both priors. The position analysis crosses coordinate channels with FDK or Gaussian initialisation, while the schedule ablation compares the two outer-level spacings. Sampler comparisons apply Langevin, predictor-corrector, VE-DDNM and VE-DPS to patch and, where implemented, whole-image priors.
 
 Unconditional generation presents four samples from each of four priors. These are whole-image diffusion, fixed patch stitching, fixed patch averaging and randomly shifted PaDIS. Sampling uses 300 geometric outer levels with one inner update per level and a common Langevin coefficient and noise scale of 1. We did not tune these settings separately, so the outputs illustrate boundary behaviour rather than rank distributional quality.
 
-Standard reconstruction jobs use seed 33 and the same first 25 test images. Fixed patch-averaging and patch-stitching rows, unconditional generation, and all \(512\times512\) reconstructions use four images or samples because of their substantially greater cost. We identify these four-image subsets explicitly and do not treat them as equally precise estimates.
+Standard reconstruction jobs use seed 33 and the same first 25 test images. Fixed patch-averaging and patch-stitching rows, unconditional generation, and all $512\times512$ reconstructions use four images or samples because of their substantially greater cost. We identify these four-image subsets explicitly and do not treat them as equally precise estimates.
 
 \section{Metrics}
 
-Metric computation uses the held-out target in the common normalised-intensity domain with data range one. Reconstructions are evaluated without per-image rescaling, and clipping is applied only where specified by each method's configuration. This work reports mean absolute error (MAE), peak signal-to-noise ratio (PSNR), and structural similarity (SSIM) \cite{wang_image_2004}. For \(N\) image pixels,
+Metric computation uses the held-out target in the common normalised-intensity domain with data range one. Reconstructions are evaluated without per-image rescaling, and clipping is applied only where specified by each method's configuration. This work reports mean absolute error (MAE), peak signal-to-noise ratio (PSNR), and structural similarity (SSIM) \cite{wang_image_2004}. For $N$ image pixels,
 \begin{align}
 \mathrm{MAE}(\hat{\mathbf{x}},\mathbf{x})
 &=\frac{1}{N}\lVert\hat{\mathbf{x}}-\mathbf{x}\rVert_1,\\
@@ -152,7 +152,7 @@ Measurement consistency is reported separately as the relative sinogram residual
 \end{equation}
 Low RSR shows that a reconstruction explains the simulated measurements. A low RSR does not by itself imply similarity to the target because sparse and limited-angle operators have large poorly constrained subspaces.
 
-We report image-level means and asymmetric central 95\% confidence intervals from 2000 deterministic bootstrap resamples using seed 33 \cite{efron_automatic_2020}, bootstrapping images rather than training runs to capture slice variation but not retraining uncertainty. For figures, we clip normalised images to \([0,1]\), and abbreviate ``Normalised Intensity'' to NI. HU panels use \autoref{eq:hounsfield_units}. We clip each row to the 15th and 95th percentiles of non-background ground-truth pixels, defined by normalised intensity above 0.02, and apply the same limits to every reconstruction and target in that row to prevent method-dependent contrast adjustment. Colour bars report these limits. The 50-mm scale bars use the configured 300-mm field of view rather than patient-native DICOM spacing. We assess unconditional generations qualitatively because they have no paired target.
+We report image-level means and asymmetric central 95\% confidence intervals from 2000 deterministic bootstrap resamples using seed 33 \cite{efron_automatic_2020}, bootstrapping images rather than training runs to capture slice variation but not retraining uncertainty. For figures, we clip normalised images to $[0,1]$, and abbreviate ``Normalised Intensity'' to NI. HU panels use \autoref{eq:hounsfield_units}. We clip each row to the 15th and 95th percentiles of non-background ground-truth pixels, defined by normalised intensity above 0.02, and apply the same limits to every reconstruction and target in that row to prevent method-dependent contrast adjustment. Colour bars report these limits. The 50-mm scale bars use the configured 300-mm field of view rather than patient-native DICOM spacing. We assess unconditional generations qualitatively because they have no paired target.
 \section{Compute and Reproducibility}
 For final training and reconstruction, we used a Google-hosted NVIDIA RTX PRO 6000 GPU, while fixed-validation tuning also used a local NVIDIA GTX 1070. Using seed 33 throughout, we developed the pipeline independently in LION, used the released repository only to check the Public-compatible track and selected checkpoints before testing. Weights \& Biases records training, and we retain artefacts on persistent cloud storage while providing reproduction scripts and instructions in \texttt{scripts/paper\_scripts/PaDIS}.
 

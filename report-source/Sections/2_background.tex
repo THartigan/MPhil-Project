@@ -5,22 +5,22 @@
 \chapter{Background}
 \label{ch:background}
 
-This section introduces only the concepts needed to interpret the experiments. These are the CT forward problem and its missing-data regimes, variance-exploding diffusion priors, the PaDIS patch construction and the reconstruction algorithms used for comparison.
+Here, we introduce the concepts required to understand the CT forward problem, its missing-data regimes, variance-exploding diffusion priors, the PaDIS patch construction method and the reconstruction algorithms used for comparison.
 
 \section{Computed Tomography}
 \label{sec:basics}
 
-X-ray computed tomography (CT) reconstructs a map of linear attenuation from transmission measurements acquired around an object \cite{guntoro_x-ray_2019}. For a ray path \(L\), the Beer--Lambert model gives
+X-ray computed tomography (CT) reconstructs a map of linear attenuation from transmission measurements acquired around an object \cite{guntoro_x-ray_2019}. For a ray path $L$, the Beer--Lambert model gives
 \begin{equation}
 I=I_0\exp\left(-\int_L \mu(\mathbf{r})\,ds\right),
 \label{eq:beer_lambert}
 \end{equation}
-where \(I_0\) and \(I\) are the incident and detected intensities. A negative logarithm converts their corrected ratio into a line integral. After discretising the attenuation image as \(\mathbf{x}\), the acquisition becomes
+where $I_0$ and $I$ are the incident and detected intensities. A negative logarithm converts their corrected ratio into a line integral. After discretising the attenuation image as $\mathbf{x}$, the acquisition becomes
 \begin{equation}
 \mathbf{y}=A\mathbf{x}+\boldsymbol{\eta},
 \label{eq:ct_forward_model}
 \end{equation}
-where \(A\) is the CT forward operator, \(\mathbf{y}\) is the sinogram, and \(\boldsymbol{\eta}\) is measurement and modelling error. If \(A\) is poorly conditioned or has a large null space, many images can explain nearly the same data.
+where $A$ is the CT forward operator, $\mathbf{y}$ is the sinogram, and $\boldsymbol{\eta}$ is measurement and modelling error. If $A$ is poorly conditioned or has a large null space, many images can explain nearly the same data.
 
 \subsection{Acquisition Geometry and Angular Undersampling}
 \label{subsec:ct_geometry_sampling}
@@ -44,7 +44,7 @@ CT values are commonly displayed in Hounsfield units (HU) \cite{abutaha_assessin
 \mathrm{HU}=1000\frac{\mu-\mu_{\mathrm{water}}}{\mu_{\mathrm{water}}},
 \label{eq:hounsfield_units}
 \end{equation}
-for which water is approximately \(0\) HU and air \(-1000\) HU. The processed LIDC-IDRI images used here are normalised to \([0,1]\). Figures displayed in HU use the dataset mapping \(\mathrm{HU}=3000x-1000\).
+for which water is approximately $0$ HU and air $-1000$ HU. The processed LIDC-IDRI images used here are normalised to $[0,1]$. Figures displayed in HU use the dataset mapping $\mathrm{HU}=3000x-1000$.
 \section{Diffusion Models}
 \label{sec:diffusion_models}
 
