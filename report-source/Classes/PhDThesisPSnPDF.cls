@@ -1224,10 +1224,9 @@ wish to left align your text}
       % supervisor is not defined
     }{
       \begin{center}
-        \makebox[\widthof{supervisorrole} + \@supervisorlinewidth][c]{
-          \Large
-          \@supervisorrole \parbox[t]{\@supervisorlinewidth}{\@supervisor}
-        }
+        {\large\bfseries \@supervisorrole\par}
+        \vspace{0.25em}
+        {\large \@supervisor\par}
       \end{center}
       \vspace{0.5em}
     } % supervisor is defined

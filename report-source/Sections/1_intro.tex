@@ -14,10 +14,24 @@
 \chapter{Introduction}
 % \nomenclature[z-PPC]{PPC}{Particles per cell}
 
-Computed tomography (CT) is widely used in medicine and industry to investigate internal structure non-destructively. X-rays are directed through an object from multiple angles and their attenuation is measured at a detector. In medical imaging, reducing the number of views or photon flux can lower patient dose, but also makes reconstruction more ill-posed and increases the influence of sampling artefacts and noise. Industrial systems can often use more views and higher energies, yet acquisition time, motion, restricted access and radiation-sensitive specimens create related constraints \cite{}.
+Computed tomography (CT) is widely used in medicine and industry to investigate
+internal structure non-destructively. X-rays are directed through an object from
+multiple angles and their attenuation is measured at a detector. In medical
+imaging, reducing the number of views or photon flux can lower patient dose, but
+also makes reconstruction more ill-posed and increases the influence of sampling
+artefacts and noise \cite{sidky_accurate_2006, chang_modeling_2017}. Industrial
+systems and research applications can often use more views and higher energies,
+yet acquisition time, motion, restricted access and radiation-sensitive
+specimens create related constraints \cite{sun_realisation_2023}.
 
-Learned image priors can regularise these underdetermined problems. Diffusion models are particularly expressive, but conventional whole-image models require substantial memory and training data \cite{}. Hu et al. proposed the Patch Diffusion Inverse Solver (PaDIS), which learns position-conditioned patch scores and combines randomly shifted patch partitions during sampling \cite{PaDIS}. In their paper, they report that PaDIS reduces training cost and outperforms an otherwise comparable whole-image diffusion prior on sparse-view CT. These claims matter for high-resolution medical imaging with small datasets, but the original PaDIS paper and its released implementation leave several experimental choices ambiguous or inconsistent.
+Learned image priors can regularise these underdetermined problems. Diffusion models are particularly expressive, but conventional whole-image models require substantial memory and training data. Hu et al. proposed the Patch Diffusion Inverse Solver (PaDIS), which learns position-conditioned patch scores and combines randomly shifted patch partitions during sampling \cite{hu_learning_2024}. Hu et al. report that PaDIS reduces training cost and outperforms an otherwise comparable whole-image diffusion prior on sparse-view CT. These claims matter for high-resolution medical imaging with small datasets, but the original PaDIS paper and its released implementation leave several experimental choices ambiguous or inconsistent.
 
-This work asks three questions. First, can the core PaDIS result be reproduced on a different public CT dataset and a physically specified fan-beam operator? Second, which conclusions persist across paper-described, released-code-compatible and operator-normalised implementations? Third, how do patch size, dataset size, positional encoding, initialisation and sampler choice affect the result? To answer them, we implemented the complete pipeline in LION \cite{lion} using patient-separated LIDC-IDRI splits. The evaluation includes FDK, TV and plug-and-play baselines, alternative diffusion samplers, fixed patch-assembly methods, PaDIS and whole-image diffusion. Experiments cover 8, 20 and 60 views, limited-angle acquisition, and native $512\times512$ reconstruction. Quantitative results include image-level bootstrap uncertainty and measurement-consistency metrics.
+The primary objectives are:
+\begin{itemize}[leftmargin=1.5em,itemsep=0.1em,topsep=0.2em,parsep=0pt]
+    \item to reproduce the core PaDIS result on a different public CT dataset using a physically specified fan-beam operator;
+    \item to compare the paper-described and released-code-compatible reproduction tracks, and evaluate the operator-normalised LION-physics extension introduced here; and
+    \item to quantify the effects of patch size, training-set size, positional encoding, initialisation and sampler choice.
+\end{itemize}
+To address these objectives, we implemented the complete pipeline in LION \cite{kiss_benchmarking_2025,noauthor_cambridgecialion_2026} using patient-separated LIDC-IDRI splits \cite{armato_iii_data_2015-1,armato_lung_2011}. The evaluation includes FDK, TV and plug-and-play baselines, alternative diffusion samplers, fixed patch-assembly methods, PaDIS and whole-image diffusion. Experiments cover 8, 20 and 60 views, limited-angle acquisition, and native $512\times512$ reconstruction. Quantitative results include image-level bootstrap uncertainty and measurement-consistency metrics.
 
-This work is therefore both a reproduction and controlled extension, testing the central claim across three explicit reconstruction tracks rather than seeking numerical identity under different data and geometry. The background section introduces CT, score-based diffusion and inverse-problem sampling. Methods are described in \secref{sec:method}, and results in \secref{sec:results}. The discussion in \secref{sec:discussion} compares them with the original PaDIS paper and assesses reproducibility before the conclusion in \secref{sec:conclusion}.
+This work therefore combines reproduction with a controlled extension, testing the central claim across three reconstruction tracks rather than seeking numerical identity under different data and geometry. The remaining chapters present the background, methods, results and discussion before the conclusion.
