@@ -11,6 +11,7 @@ The report and executive summary can be found in the [`report`](report-source/ou
 - [`PaDIS-Lion-Compat/`](PaDIS-Lion-Compat) - A forked and modified version of the original repository developed by Hu et. al. to accompany their PaDIS paper. Modifications allow their codebase to now accept the LION model checkpoints and LIDC-IDRI geometry, whilst also re-enabling some of their deactivated methods to enable comparison. This was used to check consistency against the new public-compatible LION PaDIS implementations.
 - [`report-source/`](report-source) - The source repository used to write and generate the report and executive summary.
 - [`scripts/`](scripts) - Helper scripts to automate the process of merging these repositories into this format from their github sources whilst retaining commit history.
+- `CT_Basics.md` - A more detailed summary of the computed tomography background, including areas which were presented as part of the Medical Imaging minor course.
 
 ## Primary Contributions to the LION Repository
 
