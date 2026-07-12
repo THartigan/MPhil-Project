@@ -8,9 +8,7 @@
 \label{sec:method}
 
 \section{The Dataset}
-We use the LIDC-IDRI collection and its accompanying reference-database description \cite{armato_iii_data_2015-1,armato_lung_2011}. It contains 1018 chest CT scans from 1010 patients distributed as DICOM images. LION retains one scan per patient and saves each axial slice and nodule mask as a $512\times512$ NumPy array, preventing leakage between repeat scans. All but the native-resolution experiments downsample these arrays to $256\times256$ during loading.
-
-The archived experiment split assigns sorted patient-ID slots to train, validation and test sets, ensuring that no patient contributes slices to more than one set. The default PaDIS regime selects a total of at most $4$ slices per patient, capped by the smaller of the available nodule and non-nodule counts before division between both classes. Patients without annotated nodules can therefore contribute no images. The detailed breakdown is presented in \autoref{tab:lidc_split_sizes}.
+In this work, we use the LIDC-IDRI dataset \cite{armato_iii_data_2015-1,armato_lung_2011}, which contains 1018 chest CT scans from 1010 patients distributed as DICOM images. We retain one scan per patient, and sorted patient-IDs are assigned to train, validation and test sets, meaning that no patient contributes slices to more than one set. The default PaDIS regime selects a total of at most $4$ slices per patient, capped by a requirement for equal numbers of nondule-containing and non-nodule-containing slices. The detailed breakdown is presented in \autoref{tab:lidc_split_sizes}.
 
 \begin{table}[ht] 
     \centering 
@@ -23,19 +21,17 @@ The archived experiment split assigns sorted patient-ID slots to train, validati
         \hline Total & 1012 & 3367 & 242870 \\ 
         \hline 
     \end{tabular}
-    \caption[Processed LIDC-IDRI split sizes.]{Processed LIDC-IDRI split used for the completed experiments. The 1012 sorted patient-ID slots include two empty slots retained to preserve the archived split, so they do not represent 1012 contributing patients.}
+    \caption[Processed LIDC-IDRI split sizes.]{Processed LIDC-IDRI split used for the completed experiments. The 1012 sorted patient-IDs include two with no data available.}
     \label{tab:lidc_split_sizes} 
 \end{table}
 
 \section{Experimental Geometry}
 In this work, we use a 2D fan-beam CT geometry implemented in LION \cite{kiss_benchmarking_2025,noauthor_cambridgecialion_2026}. LION's operator stack uses tomosipo \cite{hendriksen_tomosipo_2021} over the ASTRA Toolbox \cite{van_aarle_fast_2016}, while the analytic reconstruction helper is provided by \texttt{ts\_algorithms} \cite{hendriksen_ahendriksents_algorithms_2026}. Each LIDC-IDRI slice is treated independently with a $300\,\mathrm{mm}\times300\,\mathrm{mm}$ in-plane field of view. The default experiments reconstruct a $256\times 256$ grid, whilst the explicitly labelled native-resolution experiments use a $512\times 512$ grid. The detector contains $900$ bins over a $900\, \mathrm{mm}$ detector width, with a $575\,\mathrm{mm}$ source-to-origin distance and a $1050\,\mathrm{mm}$ source-to-detector distance. The simulated measurements are noise-free projections of normalised intensity rather than calibrated attenuation, isolating sparse sampling and limited angular coverage from photon-count statistics.
 
-We use fan-beam geometry to test whether the PaDIS conclusions transfer beyond Hu et al.'s parallel-beam setup and to reproduce the finite-source divergence used by clinical scanners \cite{wunderlich_image_2008}. This choice does not make the experiment clinically realistic. The operator remains two-dimensional and noise-free, and omits scatter, beam hardening, motion and cone-beam effects.
+We use fan-beam geometry to test whether the PaDIS conclusions transfer beyond Hu et al.'s parallel-beam setup and to reproduce the finite-source divergence used by clinical scanners \cite{wunderlich_image_2008}. This choice, however, still does not make the experiment clinically realistic because the operator remains two-dimensional, noise-free, and omits scatter, beam hardening, motion and cone-beam effects.
 
 \section{Model Training}
 \label{sec:methods-model-training}
-
-In this work, we train patch-based diffusion models, whole-image diffusion models and PnP denoisers to aid reconstruction.
 
 \subsection{Diffusion Model Training}
 Diffusion-prior training uses the variance-exploding regime in \secref{sec:score_based_sdes}, so the denoisers provide scores for unconditional generation and inverse problems as explained in \secref{subsec:diffusion_models_inverse_problems} and \secref{subsec:padis_approach}.
@@ -44,9 +40,9 @@ Diffusion denoisers use the noise-conditional NCSN++ model, $F_{\boldsymbol{\phi
 
 All diffusion models used Adam \cite{kingma_adam_2017-1} with learning rate $2\times10^{-4}$, ramped over the first 10 million examples or patches. EDM used $\sigma_{\mathrm{data}}=0.5$, loss weight $\lambda(\sigma)=(\sigma^2+\sigma_{\mathrm{data}}^2)/(\sigma\sigma_{\mathrm{data}})^2$, and $\log\sigma\sim\mathcal{N}(-1.2,1.2^2)$ truncated to $[0.002,40]$ \cite{karras_elucidating_2022-1}. On an RTX PRO 6000, whole-image models trained for 24 hours and patch-based models for 12.
 
-Whole-image denoisers are trained on complete $256\times256$ slices. The default patch model samples sizes 56, 32 and 16 with probabilities 0.5, 0.3 and 0.2, while the native model replaces 56 by 64. The ablations use all processed slices, alternative patch sizes or no position channels, with patch schedules in \autoref{tab:patch_size_schedules}.
+Whole-image denoisers are trained on complete $256\times256$ slices. The default patch model samples sizes 56, 32 and 16 with probabilities 0.5, 0.3 and 0.2, while the native resolution model replaces 56 by 64. Ablations investigate using much more training data (all processed slices), removing position channels, and alternative patch sizes with training schedules listed in \autoref{tab:patch_size_schedules}.
 
-Validation monitoring continued throughout training. During the final six hours, validation was increased and the exponential-moving-average checkpoint with the minimum mean EDM validation loss during this period, referred to as \texttt{min\_intense\_val}, was selected for reconstruction and generation.
+Validation was performed throughout training. However, during the final six hours, it was conducted more frequently and over more validation samples. At each validation, the mean EDM loss was evaluated using an exponential moving average (EMA) of the model parameters. The EMA parameter state with the lowest loss during this phase was saved as \texttt{min\_intense\_val} and used for reconstruction and generation.
 
 \begin{table}[ht] 
     \centering 
@@ -61,7 +57,7 @@ Validation monitoring continued throughout training. During the final six hours,
         $P=96$ & $32,\ 64,\ 96$ & $0.2,\ 0.3,\ 0.5$ & $32$ \\ 
         \hline 
     \end{tabular} 
-    \caption[PaDIS patch-size training schedules.]{Patch-size schedules used for the PaDIS patch-size ablations. Each training step samples one patch size according to the listed probabilities. The $P=56$ row is the default PaDIS patch schedule used for the main 256-resolution patch model.}
+    \caption[PaDIS patch-size training schedules.]{Patch-size schedules used for PaDIS patch-size ablations. Each training step samples one patch size according to the listed probabilities. The $P=56$ row is the default.}
     \label{tab:patch_size_schedules}
 \end{table}
 
@@ -73,7 +69,7 @@ Both models use the four-slice split, Adam at $10^{-4}$ for 100 epochs, batch si
 \section{Reconstructor Implementation}
 \label{sec:methods-reconstructor-implementation}
 
-The original PaDIS paper and released code specify some methods differently (\secref{sec:discussion-reproducibility}) \cite{hu_learning_2024,hu_jasonhu4padis_2026-1}. Paper-style follows the written algorithms, Public-compatible follows the released code, and LION-physics is our operator-normalised extension. The reproduction tracks exist only where the original PaDIS work gives enough detail, whereas LION-physics covers all methods. \autoref{tab:methods_by_implementation} summarises these combinations, with differences in \secref{subsec:public-compatible-implementation} and \secref{subsec:lion-physics-implementations}.
+The original PaDIS paper and released code specify some methods differently (\secref{sec:discussion-reproducibility}) \cite{hu_learning_2024,hu_jasonhu4padis_2026-1}, so we choose to implement both versions. Paper-style follows the written algorithms, Public-compatible follows the released code, and LION-physics is our operator-normalised extension. The reproduction tracks exist only where the original PaDIS work gives enough detail, whereas LION-physics covers all methods. \autoref{tab:methods_by_implementation} summarises these combinations, with differences in \secref{subsec:public-compatible-implementation} and \secref{subsec:lion-physics-implementations}.
 
 \begin{table}[ht]
   \centering
@@ -113,7 +109,7 @@ The Public-compatible track retains these rules, clipping and patch randomisatio
 \label{subsec:lion-physics-implementations}
 Our LION-physics extension to the original PaDIS work removes these fixed scales. Following \autoref{eq:scaled_data_consistency_update}, the LION-physics update divides the squared-residual gradient by $L_F=\lVert F\rVert_2^2$, where $F$ maps the normalised image to its sinogram and its norm is estimated with 20 power iterations and tolerance $10^{-4}$ \cite{golub_matrix_2012,beck_fast_2009}. This makes the data-consistency coefficient more comparable between geometries, but does not guarantee sampler convergence.
 
-These implementations otherwise use the geometric schedule from the original PaDIS paper, with predictor-corrector retaining the paper-style noise-level and patch-layout choices. Every VE-DDNM track clips its FDK pseudoinverse terms to prevent non-finite values, while paper-style and LION-physics also clip the corrected state. The selected LION-physics patch VE-DDNM further uses noise scale 0.5, and operator normalisation applies only to diffusion data updates.
+These implementations otherwise use the geometric schedule from the original PaDIS paper, with predictor-corrector retaining the paper-style noise-level and patch-layout choices. Every VE-DDNM track clips its FDK approximate-inverse terms to prevent non-finite values, while paper-style and LION-physics also clip the corrected state. The selected LION-physics patch VE-DDNM further uses noise scale 0.5, and operator normalisation applies only to diffusion data updates.
 
 Patch averaging and stitching use fixed layouts with an eight-pixel overlap. Averaging takes the mean of all predictions covering each pixel, whilst stitching allows later patches to replace earlier values in overlaps. Both use DPS, but unlike PaDIS they do not repeatedly redraw shifted patch partitions. They are experimental controls rather than implementations of previously published algorithms: overlapping-patch diffusion provides context for averaging local denoisers \cite{ozdenizci_restoring_2023}, while prior tile-based analysis motivates checking fixed-boundary and shift effects \cite{rumberger_how_2021}.
 

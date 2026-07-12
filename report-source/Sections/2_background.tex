@@ -5,7 +5,7 @@
 \chapter{Background}
 \label{ch:background}
 
-Here, we introduce the concepts required to understand the CT forward problem, its missing-data regimes, variance-exploding diffusion priors, the PaDIS patch construction method and the reconstruction algorithms used for comparison.
+Here, we introduce the concepts required to understand the CT forward problem, its missing-data regimes, variance-exploding diffusion priors, the PaDIS patch construction method and the reconstruction algorithms used for comparison. For the unacquainted reader, a more comprehensive review of CT fundamentals is given \href{https://github.com/THartigan/MPhil-Project/blob/main/CT_Basics.md}{here}.
 
 \section{Computed Tomography}
 \label{sec:basics}
@@ -15,7 +15,7 @@ X-ray computed tomography (CT) reconstructs a map of linear attenuation from tra
 I=I_0\exp\left(-\int_L \mu(\mathbf{r})\,ds\right),
 \label{eq:beer_lambert}
 \end{equation}
-where $I_0$ and $I$ are the incident and detected intensities. A negative logarithm converts their corrected ratio into a line integral. After discretising the attenuation image as $\mathbf{x}$, the acquisition becomes
+where $I_0$ and $I$ are the incident and detected intensities. A negative logarithm converts their corrected ratio into a line integral. For a discretised attenuation image, $\mathbf{x}$, the acquisition produced by many projection angles (views) and many offsets is then
 \begin{equation}
 \mathbf{y}=A\mathbf{x}+\boldsymbol{\eta},
 \label{eq:ct_forward_model}
@@ -32,7 +32,7 @@ Each parallel-beam view samples a radial line of the object's Fourier transform.
 \subsection{Dose, Noise and Display}
 \label{subsec:ct_noise_display}
 
-Dose can be reduced using fewer views or photons, but these create different inverse problems. Fewer views increase angular undersampling, whereas low photon counts increase signal-dependent noise. Photon detection is approximately Poisson \cite{chang_modeling_2017},
+Dose can be reduced by using fewer views or photons, but these create different inverse problems. Using fewer views increases angular undersampling, whereas using low photon counts increases signal-dependent noise. With $C$ the detected photon count, $C_0$ the incident count, and $P=-\log(I/I_0)$ the ideal line-integral projection from the Beer--Lambert model above, photon detection is approximately Poisson \cite{chang_modeling_2017},
 \begin{equation}
 C\sim\operatorname{Poisson}\!\left(C_0e^{-P}\right),
 \label{eq:poisson_photon_count}
@@ -44,125 +44,16 @@ CT values are commonly displayed in Hounsfield units (HU) \cite{abutaha_assessin
 \mathrm{HU}=1000\frac{\mu-\mu_{\mathrm{water}}}{\mu_{\mathrm{water}}},
 \label{eq:hounsfield_units}
 \end{equation}
-for which water is approximately $0$ HU and air $-1000$ HU. The processed LIDC-IDRI images used here are normalised to $[0,1]$. Figures displayed in HU use the dataset mapping $\mathrm{HU}=3000x-1000$.
+for which water is approximately $0$ HU and air $-1000$ HU. The processed LIDC-IDRI images used here are normalised to $[0,1]$. Figures displayed in HU then use the simple mapping $\mathrm{HU}=3000x-1000$.
 \section{Diffusion Models}
 \label{sec:diffusion_models}
-
-Diffusion models learn to reverse a gradual noise process \cite{ho_denoising_2020-1}. Score-based variants estimate the noisy log-density gradient needed to denoise or sample.
-
-% A diffusion model is a constrained version of a Variational Autoencoder \cite{ho_denoising_2020-1} where a fixed encoder is used to gradually corrupt data, and a learned decoder acts to reverse this process. Where $\mathbf{x}$ denotes a clean data sample and $\mathbf{z}_1, \dots, \mathbf{z}_T$ denote noisy latent variables, the forward process is
-
-% \begin{align}
-% \mathbf{z}_1 &= \sqrt{1-\beta_1}\mathbf{x}+\sqrt{\beta_1}\boldsymbol{\epsilon}_1,\\
-% \mathbf{z}_t &= \sqrt{1-\beta_t}\mathbf{z}_{t-1}+\sqrt{\beta_t}\boldsymbol{\epsilon}_t,\qquad t=2,\ldots,T,
-% \label{eq:ddpm_forward_process}
-% \end{align}
-
-% where $\boldsymbol{\epsilon}_t \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$ and $\beta_t$ is the discrete noise schedule. This can equivalently be written as
-
-% \begin{equation}
-% q(\mathbf{z}_t\mid \mathbf{z}_{t-1})=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{1-\beta_t}\mathbf{z}_{t-1},\beta_t\mathbf{I}\right].
-% \label{eq:ddpm_forward_transition}
-% \end{equation}
-
-% By defining
-
-% \begin{equation}
-% \bar{\alpha}_t=\prod_{s=1}^t(1-\beta_s)
-% \label{eq:alpha_bar_definition}
-% \end{equation}
-
-% and recursively combining Gaussian noise terms, we obtain the diffusion kernel
-
-% \begin{align}
-% \mathbf{z}_t&=\sqrt{\bar{\alpha}_t}\mathbf{x}+\sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}\\
-% \implies
-% q(\mathbf{z}_t\mid \mathbf{x})&=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{\bar{\alpha}_t}\mathbf{x},(1-\bar{\alpha}_t)\mathbf{I}\right],
-% \label{eq:forward_kernel}
-% \end{align}
-
-% allowing for arbitrary noisy latents to be sampled directly from $\mathbf{x}$ without simulating all previous steps.
-
-% The reverse transitions $q(\mathbf{z}_{t-1}|\mathbf{z}_t)$, however, cannot be determined analytically due to the unknown data distribution. Instead, DDPM models learn a Gaussian approximation
-
-% \begin{equation}
-% p_{\boldsymbol{\phi}}(\mathbf{z}_{t-1}\mid \mathbf{z}_t)=\operatorname{Norm}_{\mathbf{z}_{t-1}}\left[\mathbf{f}_{\boldsymbol{\phi}}(\mathbf{z}_t,t),\sigma_t^2\mathbf{I}\right].
-% \label{eq:learned_reverse_transition}
-% \end{equation}
-
-% Chaining many of these denoising steps allows for construction of the joint distribution, $p_{\boldsymbol{\phi}}(\mathbf{x}, \mathbf{z}_{1, \dots, T})$, which can then be used to derive the evidence lower bound, ELBO such that
-
-% \begin{equation}
-% \log p_{\boldsymbol{\phi}}(\mathbf{x})\ge \text{ELBO}(\mathbf{x}; \boldsymbol{\phi}).
-% \label{eq:elbo_bound}
-% \end{equation}
-
-% Minimising the negative ELBO therefore trains a network to predict slightly denoised latents $\mathbf{z}_{t-1}$ from the noisier $\mathbf{z}_t$ versions.
-
-% Using Bayes theorem along with the Gaussian change of variables identity and the product of two Gaussians combination identity allows us to express
-
-% \begin{align}
-% q(\mathbf{z}_{t-1}|\mathbf{z}_t, \mathbf{x})
-% &=\frac{q(\mathbf{z}_t|\mathbf{z}_{t-1}, \mathbf{x}) q(\mathbf{z}_{t-1}|\mathbf{x})}{q(\mathbf{z}_t|\mathbf{x})}\\
-% &=\operatorname{Norm}_{\mathbf{z}_t}\left[\sqrt{1-\beta_t}\mathbf{z}_{t-1}, \beta_t\mathbf{I}\right]\operatorname{Norm}_{\mathbf{z}_{t-1}}\left[\sqrt{\bar{\alpha}_{t-1}}\mathbf{x}, (1-\bar{\alpha}_{t-1})\mathbf{I}\right]\\
-% &=\operatorname{Norm}_{\mathbf{z}_{t-1}}\left[\frac{(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_t}\sqrt{1-\beta_t}\mathbf{z}_t+\frac{\sqrt{\bar{\alpha}_{t-1}}\beta_t}{1-\bar{\alpha}_t}\mathbf{x}, \frac{\beta_t(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_t}\mathbf{I}\right].
-% \label{eq:reverse_normal}
-% \end{align}
-
-% Therefore, if the clean image $\mathbf{x}$ were known, the exact reverse transition would also be known. We can therefore equivalently train a denoising model to predict clean images, conditioned on the noisy image and the noise level, $\hat{\mathbf{x}}_\boldsymbol{\phi}$, such that
-
-% \begin{equation}
-% \mathbf{x}\approx \hat {\mathbf{x}}_{\boldsymbol{\phi}}(\mathbf{z}_t, t).
-% \label{eq:x0_prediction}
-% \end{equation}
-
-% When used in conjunction with \eqref{eq:reverse_normal}, this provides a local denoising direction, allowing repeated movement to slightly cleaner states.
-
-% Equation \eqref{eq:forward_kernel} also shows that predicting $\mathbf{x}$ is equivalent to predicting the noise added to it at a given diffusion step, so
-
-% \begin{equation}
-% \boldsymbol{\epsilon}_{\boldsymbol{\phi}}(\mathbf{z}_t,t)
-% =
-% \frac{\mathbf{z}_t-\sqrt{\bar{\alpha}_t}\hat{\mathbf{x}}_{\boldsymbol{\phi}}(\mathbf{z}_t,t)}{\sqrt{1-\bar{\alpha}_t}}.
-% \label{eq:epsilon_from_x_prediction}
-% \end{equation}
-
-% In this formulation, we can simplify the ELBO with Gaussian identities and the properties of the KL divergence, giving rise to the standard DDPM training loss \cite{ho_denoising_2020-1},
-
-% \begin{equation}
-% \mathcal{L}_{\mathrm{DDPM}}(\boldsymbol{\phi})=
-% \mathbb{E}_{\mathbf{x},t,\boldsymbol{\epsilon}}
-% \left[
-% \left\|
-% \boldsymbol{\epsilon}-\boldsymbol{\epsilon}_{\boldsymbol{\phi}}
-% \left(\sqrt{\bar{\alpha}_t}\mathbf{x}+\sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon},t\right)
-% \right\|_2^2
-% \right].
-% \label{eq:ddpm_training_loss}
-% \end{equation}
-
-% Applying Tweedie's formula \cite{efron_tweedies_2011,vincent_connection_2011} to \eqref{eq:forward_kernel}, and applying the known form of a Gaussian mean, we can then also show that
-
-% \begin{equation}
-% \nabla_{\mathbf{z}_t}\log p_t(\mathbf{z}_t)
-% \approx
-% -\frac{\boldsymbol{\epsilon}_{\boldsymbol{\phi}}(\mathbf{z}_t,t)}{\sqrt{1-\bar{\alpha}_t}},
-% \label{eq:ddpm_score_from_noise}
-% \end{equation}
-
-% where we notice the left hand term is equal to the score of the distribution of noisy latents at time $t$. In general, we define this as
-
-% \begin{equation}
-% \mathbf{s}_t(\mathbf{z})=\nabla_{\mathbf{z}}\log p_t(\mathbf{z}).
-% \label{eq:score_definition}
-% \end{equation}
-
-% Therefore, predicting the slightly denoised latent, $\mathbf{z}_{t-1}$, the fully denoised image, $\mathbf{x}$, the noise, $\boldsymbol{\epsilon}$, and the score, $\nabla_{\mathbf{z}} \log p_t(\mathbf{z})$ are equivalent parameterisations of the same reverse process. For inverse problems, the score parameterisation is particularly useful because it gives a learned prior gradient, which can be exploited in conjunction with measurement-consistency terms from forward models.
 
 \subsection{Score-Based SDEs and Variance-Exploding Models}
 \label{sec:score_based_sdes}
 
-In the continuous-time limit, a noising process can be represented by the stochastic differential equation
+If we can use a diffuson model to predict score terms, then they can be used to approximate the noisy log-density gradient needed in inverse-problem denoisers and samplers. 
+
+To analyse these score-based vaiants, we consider the continuous-time limit, allowing the noising process can be represented by the stochastic differential equation
 
 \begin{equation}
 d\mathbf{z}=\mathbf{f}(\mathbf{z},\tau)d\tau+g(\tau)d\mathbf{w},
@@ -192,7 +83,7 @@ d\mathbf{z}=-\frac{1}{2}\beta(\tau)\mathbf{z}\,d\tau+\sqrt{\beta(\tau)}\,d\mathb
 \label{eq:vp_sde}
 \end{equation}
 
-where $\beta(\tau)$ is a continuous noise-rate schedule. The construction keeps variance bounded for standardised data, but changes the image scale across time.
+where $\beta(\tau)$ is a continuous noise-rate schedule. This construction keeps variance bounded for standardised data, but changes the image scale across time.
 
 In contrast, variance-exploding (VE) SDEs are parameterised directly by a noise scale $\sigma$, and add Gaussian noise with increasing variance, such that a noisy image at noise level $\sigma$ is given by
 
@@ -271,14 +162,14 @@ clean training images. The coefficient $c_{\mathrm{in}}$ rescales the noisy
 input before it is passed to $F_{\boldsymbol{\phi}}$, while $c_{\mathrm{noise}}$
 converts the noise level to a logarithmic scale.
 
-The skip connection allows the denoiser make only small adjustments at low noise levels, whereas at high noise levels, $c_{\mathrm{skip}}$ becomes small, so the denoised estimate relies more heavily on the learned network output. The coefficient $c_{\mathrm{out}}$ then scales this output so that it has the appropriate magnitude for the current noise level. Once the wrapped denoiser $D_{\boldsymbol{\phi}}$ has been formed, a score estimate can still be given by \autoref{eq:score_from_denoiser}.
+The skip connection allows the denoiser to make only small adjustments at low noise levels, whereas at high noise levels, $c_{\mathrm{skip}}$ becomes small, so the denoised estimate relies more heavily on the learned network output. The coefficient $c_{\mathrm{out}}$ then scales this output so that it has the appropriate magnitude for the current noise level. Once the wrapped denoiser $D_{\boldsymbol{\phi}}$ has been formed, a score estimate can still be given by \autoref{eq:score_from_denoiser}.
 
 \subsection{The PaDIS Approach}
 \label{subsec:padis_approach}
 
 Instead of learning to denoise complete images, PaDIS learns a diffusion prior from image patches, alongside their positional information. This aims to reduce both the memory and data requirements for training, with single images providing many training examples \cite{hu_learning_2024}.
 
-Let $G_c$ be an operator which extracts a patch, $c$, of size $P$ from an image $\mathbf{x}$ of size $N$, along with the positional encoding for the patch, $\boldsymbol{\rho}_c$, before adding noise to only the image part. This positional encoding is formed by scaling the $x$ and $y$ coordinates of the image pixels and scaling them between $-1$ and $1$. A noisy patch can then be denoted as
+Let $G_c$ be an operator which extracts a patch, $c$, of size $P$ from an image $\mathbf{x}$ of size $N$, along with the positional encoding for the patch, $\boldsymbol{\rho}_c$, before adding noise to only the image part. The positional encoding is formed by scaling the $x$ and $y$ coordinates of the image pixels between $-1$ and $1$. A noisy patch can then be denoted as
 
 \begin{equation}
 G_c\mathbf{x}+\sigma\boldsymbol{\epsilon},
@@ -287,7 +178,8 @@ G_c\mathbf{x}+\sigma\boldsymbol{\epsilon},
 \label{eq:noisy_patch}
 \end{equation}
 
-Using this, Hu et al. define a patch denoising objective \cite{hu_learning_2024}; its variable-size, coordinate-conditioned patch training follows the broader Patch Diffusion construction \cite{wang_patch_2023-1},
+Using this, Hu et al. \cite{hu_learning_2024} follow the Patch Diffusion 
+\cite{wang_patch_2023-1} approach to variable-size, coordinate-conditioned patch training to define the training objective,
 
 \begin{equation}
 \mathcal L_{\mathrm{PaDIS}}(\boldsymbol{\phi})
@@ -316,7 +208,7 @@ G_c\mathbf{z}
 \label{eq:padis_patch_score}
 \end{equation}
 
-Where $k=\left\lfloor N/P \right\rfloor$, an $N\times N$ image could be covered by a $(k+1)\times(k+1)$ grid of non-overlapping $P\times P$ patches after padding. Naively fixing this patch partition and combining the corresponding patch scores would enable construction of a whole-image score, but would cause visible patch boundaries because the patch boundaries remain fixed throughout sampling. To mitigate this, PaDIS zero-pads each image on all sides by
+Where $k=\left\lfloor N/P \right\rfloor$, an $N\times N$ image could be covered by a $(k+1)\times(k+1)$ grid of non-overlapping $P\times P$ patches after padding. Naively fixing this patch partition and combining the corresponding patch scores would enable construction of a whole-image score, but would cause visible patch boundaries because the patch boundaries remain fixed throughout sampling. To mitigate this, the PaDIS approach zero-pads each image on all sides by
 
 \begin{equation}
 M=(k+1)P-N,
@@ -326,13 +218,13 @@ M=(k+1)P-N,
 giving a padded image of size $(N+2M)\times(N+2M)$. PaDIS then considers many different non-overlapping patch partitions, indexed by shifts
 
 \begin{equation}
-(i,j)\in\{0,\dots,M-1\}^2.
+(i,j)\in\{0,\dots,M-1\}^2,
 \label{eq:padis_shifts}
 \end{equation}
 
-Each choice of $(i,j)$ also implicitly defines the remaining outer border region from zero-padding. This adds flexibility to the model by allowing different shifts to be sampled during reconstruction, thereby reducing fixed-boundary artefacts.
+where each choice of $(i,j)$ also implicitly defines the remaining outer border region from zero-padding. This adds flexibility to the model by allowing different shifts to be sampled during reconstruction, reducing fixed-boundary artefacts.
 
-Using the above, the full-image distribution at noise level $\sigma$ can be modelled as
+Using the shifted-patch construction above and the definition of $p_\sigma$ in \autoref{eq:ve_marginal}, the full-image distribution at noise level $\sigma$ can be modelled as
 
 \begin{equation}
 p_\sigma(\mathbf{z})
@@ -372,7 +264,7 @@ G_{i,j,r}^T
 \label{eq:padis_score_estimate}
 \end{equation}
 
-where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. In the original PaDIS paper, Hu et al. found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions \cite{hu_learning_2024,chung_diffusion_2022,song_generative_2019}.
+where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. In the original PaDIS paper, Hu et al. found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions \cite{hu_learning_2024,chung_diffusion_2022,song_generative_2019}. Here, that method is referred to as VE-DPS.
 
 \section{Reconstruction Methods}
 \label{sec:reconstruction_methods}
@@ -380,9 +272,8 @@ where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{
 \subsection{Filtered Back-Projection and the FDK Method}
 \label{subsec:fbp_fdk}
 
-Filtered back-projection (FBP) reconstructs parallel-beam data by applying a ramp filter to each projection before back-projecting it through the image. The filter compensates for the over-representation of low spatial frequencies, making FBP fast and interpretable when angular sampling is dense. Sparse views instead produce characteristic streaks because the missing angular information cannot be recovered by filtering alone \cite{sidky_accurate_2006,jin_bone-induced_2012}.
+Filtered back-projection (FBP) reconstructs parallel-beam data by applying a ramp filter to each projection before back-projecting it through the image. The filter compensates for the over-representation of low spatial frequencies, making FBP fast and interpretable when angular sampling is dense. Sparse views instead produce characteristic streaks because the missing angular information cannot be recovered by filtering alone \cite{sidky_accurate_2006,jin_bone-induced_2012}. Fan-beam and cone-beam analogues additionally weight projections for the divergent ray geometry \cite{feldkamp_practical_1984}.
 
-Fan-beam and cone-beam analogues additionally weight projections for the divergent ray geometry \cite{feldkamp_practical_1984}. LION uses its FDK implementation as the analytic baseline for the fan-beam experiments in this work.
 \subsection{Iterative Reconstruction and Denoising Priors}
 \label{subsec:iterative_reconstruction_denoising_priors}
 
@@ -412,7 +303,7 @@ A^T(A\mathbf{x}-\mathbf{y}),
 \label{eq:data_loss_gradient}
 \end{equation}
 
-enabling data-consistency updates of the form
+where $A^T$ denotes the adjoint, or back-projection, operator. This enables data-consistency updates of the form
 
 \begin{equation}
 \mathbf{x}^{k+1}
@@ -433,7 +324,7 @@ A^TA,
 \label{eq:data_loss_hessian}
 \end{equation}
 
-so, for the pure quadratic loss term, stable updates in all directions are obtained by taking
+so the gradient is Lipschitz continuous with Lipschitz constant $L=\|A^TA\|_2$. For the pure quadratic loss term, the resulting Landweber iteration is stable when \cite{hansen_discrete_2010}
 
 \begin{equation}
 0<\delta_{\mathrm{data}}<\frac{2}{\|A^TA\|_2},
@@ -454,7 +345,7 @@ where
 \label{eq:operator_norm_definition}
 \end{equation}
 
-Because $A^TA$ is symmetric and positive semi-definite,
+Because $A^TA$ is symmetric and positive semi-definite \cite{golub_matrix_2012},
 
 \begin{equation}
 \|A^TA\|_2
@@ -465,7 +356,7 @@ Because $A^TA$ is symmetric and positive semi-definite,
 \label{eq:operator_norm_relation}
 \end{equation}
 
-so a more stable version of the update is
+so an operator-normalised form of the update is
 
 \begin{equation}
 \mathbf{x}^{k+1}
@@ -477,7 +368,7 @@ A^T(A\mathbf{x}^k-\mathbf{y}),
 \label{eq:scaled_data_consistency_update}
 \end{equation}
 
-with $0<\zeta<2$ giving stability. The spectral norm can be estimated by power iteration \cite{golub_matrix_2012}, while the resulting Lipschitz-scaled gradient step follows standard first-order inverse-problem optimisation practice \cite{beck_fast_2009}. Although this does not guarantee convergence once additional priors, denoisers or sampling steps are introduced, it does give the measurement-gradient part of the update the correct scale. This scaling is particularly important in CT because $\|A\|_2$ depends on the projection geometry, detector spacing, number of views, image resolution and measurement units. Therefore, without it, a specific data-consistency coefficient loses meaning across different setups.
+with $0<\zeta<2$ giving stability \cite{hansen_discrete_2010}. The spectral norm can be estimated by power iteration \cite{golub_matrix_2012}, enabling the appropriate scaling of gradient steps by the reciprocal their Lipschitz constant \cite{beck_fast_2009}. Although this does not guarantee convergence once additional priors, denoisers or sampling steps are introduced, it does give the measurement-gradient part of the update the correct scale. This scaling is particularly important in CT because $\|A\|_2$ depends on the projection geometry, detector spacing, number of views, image resolution and measurement units. Therefore, without it, a specific data-consistency coefficient loses meaning across different setups.
 
 This squared-error term alone is normally insufficient in sparse-view CT because many images provide approximately correct measurement projections. Iterative reconstruction is therefore often combined with another regularising term, $R(\mathbf{x})$, such that
 
@@ -492,7 +383,7 @@ This squared-error term alone is normally insufficient in sparse-view CT because
 \label{eq:regularised_reconstruction_objective}
 \end{equation}
 
-Often, a total-variation regulariser is used \cite{rudin_nonlinear_1992}, where
+Often, a total-variation regulariser is used \cite{rudin_nonlinear_1992}. With $D_x$ and $D_y$ denoting the horizontal and vertical finite-difference operators, it is defined as
 
 \begin{equation}
 R(\mathbf{x})=\mathrm{TV}(\mathbf{x})
@@ -506,11 +397,21 @@ R(\mathbf{x})=\mathrm{TV}(\mathbf{x})
 \label{eq:total_variation_regulariser}
 \end{equation}
 
-favouring piecewise-smooth images while retaining sharp edges, approximately matching the expected form of CT images.
+favouring piecewise-smooth images while retaining sharp edges -- approximately matching the expected form of CT images.
 
-Chambolle--Pock (CP) solves the non-smooth isotropic TV objective with alternating primal and dual updates \cite{chambolle_first-order_2011}. Its proximal steps handle TV directly and avoid ADMM's geometry-dependent linear solve, so the same formulation applies to different CT operators.
+Chambolle--Pock (CP) solves this non-smooth objective by writing it in the equivalent primal--dual form \cite{chambolle_first-order_2011}
 
-Instead of these explicit regularisers, plug-and-play methods use a learned denoiser within an iterative algorithm \cite{chan_plug-and-play_2017}. The PnP-ADMM method used here separates the data-fitting image, $\mathbf{x}$, denoised image, $\mathbf{v}$, and scaled dual variable, $\mathbf{u}$, with the data update
+\begin{equation}
+\min_{\mathbf{x}}\max_{\mathbf{p},\,\|\mathbf{q}_i\|_2\leq\lambda}
+\langle A\mathbf{x}-\mathbf{y},\mathbf{p}\rangle
++\langle D\mathbf{x},\mathbf{q}\rangle
+-\frac{1}{2}\|\mathbf{p}\|_2^2.
+\label{eq:chambolle_pock_saddle}
+\end{equation}
+
+Here, $D\mathbf{x}=(D_x\mathbf{x},D_y\mathbf{x})$, the auxiliary dual variable $\mathbf{p}$ represents the projection residual, and $\mathbf{q}$ represents the image gradient. Maximising over $\mathbf{p}$ recovers the squared data-fidelity term, and the pixelwise constraint on $\mathbf{q}$ recovers $\lambda\mathrm{TV}(\mathbf{x})$. CP alternates updates of $\mathbf{x}$, $\mathbf{p}$ and $\mathbf{q}$, using $A^T$ and $D^T$ to map the dual updates from projection and gradient space back into image space. This avoids the ADMM geometry-dependence, so the same formulation applies to different CT operators.
+
+Unlike these explicit regularisers, plug-and-play methods use a learned denoiser within an iterative algorithm \cite{chan_plug-and-play_2017}. PnP-ADMM alternates between a data-fitting estimate $\mathbf{x}$ and a denoised estimate $\mathbf{v}$. It also maintains $\mathbf{u}$, which accumulates the differences between the two estimates and enters updates with opposing signs to compensate for persistent differences. Given $\mathbf{v}^k$ and $\mathbf{u}^k$, the next data-fiting estimate is obtained from
 
 \begin{equation}
 (A^TA+\eta I)\mathbf{x}^{k+1}
@@ -528,7 +429,7 @@ followed by
 \label{eq:pnp_denoising_update}
 \end{equation}
 
-where $D_\sigma$ removes noise at scale $\sigma$ and conjugate gradients approximately solve the linear system, alternating measurement agreement with a learned clean-image prior.
+where $D_\sigma$ removes noise at scale $\sigma$. The parameter $\eta$ controls the strength of agreement between the two estimates, and the conjugate gradient method is used to approximately solve the linear system of \autoref{eq:pnp_data_update}.
 
 \subsection{Diffusion Models for Inverse Problems}
 \label{subsec:diffusion_models_inverse_problems}
@@ -587,7 +488,7 @@ the data-consistency update is
 \label{eq:dps_data_update}
 \end{equation}
 
-which can then be followed by at least one Langevin prior step as in \eqref{eq:Langevin_step}. This is generally termed DPS-Langevin reconstruction; with the PaDIS score computation in \autoref{eq:padis_score_estimate}, it is termed the PaDIS reconstruction method.
+which can then be followed by at least one Langevin prior step as in \eqref{eq:Langevin_step}. This is generally referred to as the VE-DPS solver throughout this work, with the prior type also quoted. When the prior is patch-based, each step chooses random patch-image offset indices $(i,j)$ and uses the PaDIS combined patches score from \autoref{eq:padis_score_estimate}, matching the PaDIS solver description of Hu et al. \cite{hu_learning_2024}. This convention is used by all diffusion-based inverse solvers in this work.
 
 Discretising the reverse-time SDE \eqref{eq:reverse_time_sde} gives an alternative prediction step from noise level $\sigma_k$ to $\sigma_{k+1}$,
 
@@ -599,20 +500,20 @@ Discretising the reverse-time SDE \eqref{eq:reverse_time_sde} gives an alternati
 (\sigma_k^2-\sigma_{k+1}^2)
 \mathbf{s}_{\boldsymbol{\phi}}(\mathbf{z}^k,\sigma_k)
 +
-\sqrt{\sigma_k^2-\sigma_{k+1}^2}\boldsymbol{\xi}^k,
+\sqrt{\sigma_k^2-\sigma_{k+1}^2}\boldsymbol{\xi}^k.
 \label{eq:pc_predictor_step}
 \end{equation}
 
-followed by correction towards regions of higher probability under the learned image prior using the Langevin step from \eqref{eq:Langevin_step}. This procedure is known as the predictor-corrector (PC) method \cite{song_score-based_2020-1}.
+This can then be followed by correction towards regions of higher probability under the learned image prior using the Langevin step from \eqref{eq:Langevin_step}. This procedure is known as the predictor-corrector (PC) method \cite{song_score-based_2020-1}.
 
-Instead of descending the square residual, DDNM methods \cite{wang_zero-shot_2022-1} impose measurement consistency through an approximate pseudoinverse of the form
+Instead of descending the square residual, DDNM methods \cite{wang_zero-shot_2022-1} impose measurement consistency on the denoised $\hat {\mathbf{x}}_0^k$ image using an approximate inverse of the forward operator. Denoting the FDK-based approximate inverse by $B$, the correction takes the form
 
 \begin{equation}
 \hat{\mathbf{x}}_{\mathbf{y}}^k
 =
-A^\dagger\mathbf{y}
+B\mathbf{y}
 +
-(I-A^\dagger A)\hat{\mathbf{x}}_0^k.
+(I-BA)\hat{\mathbf{x}}_0^k.
 \label{eq:ddnm_measurement_consistency}
 \end{equation}
 
