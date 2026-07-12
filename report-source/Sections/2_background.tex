@@ -528,4 +528,4 @@ Here, the first term gives the component determined by the sinogram, and the sec
 \label{eq:ddnm_score_estimate}
 \end{equation}
 
-The reconstruction is then updated at least once using the Langevin step from \eqref{eq:Langevin_step}, where $\mathbf{s}_{\boldsymbol{\phi}}(\tilde{\mathbf{z}}^k,\sigma_k)=\mathbf{s}_{\mathrm{DDNM}}(\mathbf{z}^k,\sigma_k)$.
+The reconstruction is then updated at least once using the Langevin step from \eqref{eq:Langevin_step}, where $\mathbf{s}_{\boldsymbol{\phi}}(\tilde{\mathbf{z}}^k,\sigma_k)=\mathbf{s}_{\mathrm{DDNM}}(\mathbf{z}^k,\sigma_k)$. A separate noise-scale coefficient, $\gamma_{\mathrm{noise}}$, can multiply the stochastic Langevin term as $\gamma_{\mathrm{noise}}\sqrt{\alpha_k}\boldsymbol{\xi}^k$, controlling injected sampling noise without changing the denoiser noise level $\sigma_k$ or the score step.
