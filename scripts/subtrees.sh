@@ -20,6 +20,10 @@ Examples:
   ./scripts/subtrees.sh push report-source
 
 The push action requires one explicit component; it cannot target "all".
+
+Named Git remotes are optional. When an expected remote is absent, the script
+uses the component's GitHub repository directly. Override those defaults with
+REPORT_SOURCE_REMOTE_URL, LION_REMOTE_URL, or PADIS_REMOTE_URL.
 EOF
 }
 
@@ -27,17 +31,20 @@ component_config() {
     case "$1" in
         report-source)
             prefix="report-source"
-            remote="report-source"
+            remote_name="report-source"
+            remote_url="${REPORT_SOURCE_REMOTE_URL:-git@github.com:THartigan/mphil-dis-report.git}"
             branch="main"
             ;;
         LION)
             prefix="LION"
-            remote="lion"
+            remote_name="lion"
+            remote_url="${LION_REMOTE_URL:-git@github.com:THartigan/LION.git}"
             branch="feature/PaDIS_Implementation"
             ;;
         PaDIS-Lion-Compat)
             prefix="PaDIS-Lion-Compat"
-            remote="padis-lion-compat"
+            remote_name="padis-lion-compat"
+            remote_url="${PADIS_REMOTE_URL:-git@github.com:THartigan/PaDIS.git}"
             branch="main"
             ;;
         *)
@@ -46,6 +53,15 @@ component_config() {
             exit 2
             ;;
     esac
+}
+
+resolve_repository() {
+    if repository_url="$(git remote get-url "$remote_name" 2>/dev/null)"; then
+        repository="$remote_name"
+    else
+        repository="$remote_url"
+        repository_url="$remote_url"
+    fi
 }
 
 require_clean_tree() {
@@ -57,25 +73,26 @@ require_clean_tree() {
 
 run_for_component() {
     component_config "$1"
+    resolve_repository
 
-    if ! git remote get-url "$remote" >/dev/null 2>&1; then
-        printf 'Required Git remote is missing: %s\n' "$remote" >&2
+    if [[ ! -d "$prefix" ]]; then
+        printf 'Subtree directory is missing: %s\n' "$prefix" >&2
         exit 1
     fi
 
     case "$action" in
         status)
-            printf '%-20s remote=%-20s branch=%s\n' "$prefix" "$remote" "$branch"
+            printf '%-20s source=%s branch=%s\n' "$prefix" "$repository_url" "$branch"
             git log -1 --oneline -- "$prefix"
             ;;
         fetch)
-            git fetch "$remote" "$branch"
+            git fetch "$repository" "$branch"
             ;;
         pull)
-            git subtree pull --prefix="$prefix" "$remote" "$branch"
+            git subtree pull --prefix="$prefix" "$repository" "$branch"
             ;;
         push)
-            git subtree push --prefix="$prefix" "$remote" "$branch"
+            git subtree push --prefix="$prefix" "$repository" "$branch"
             ;;
     esac
 }
@@ -101,7 +118,8 @@ case "$action" in
         ;;
 esac
 
-repo_root="$(git rev-parse --show-toplevel)"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel)"
 cd "$repo_root"
 
 if [[ "$action" == "pull" || "$action" == "push" ]]; then
