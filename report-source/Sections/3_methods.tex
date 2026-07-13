@@ -117,7 +117,7 @@ The data updates within the VE-DPS sampler are varied across implementations. Wh
 \label{eq:implementation_data_updates}
 \end{equation}
 
-Here, each gradient is taken through the diffusion denoiser and $c_{\mathrm{DPS}}=0.0405$ is the Repo-Faithful calibration constant.
+Here, each gradient is taken through the diffusion denoiser. In Repo-Faithful, $c_{\mathrm{DPS}}=0.0405$ scales this VE-DPS gradient and $c_{\mathrm{adj}}=0.1022$ scales the direct $F^T\mathbf{r}^k$ correction in Langevin and both predictor-corrector updates.
 
 Patch averaging and stitching use fixed layouts with an eight-pixel overlap.
 Averaging takes the mean of all predictions covering each pixel, whilst
