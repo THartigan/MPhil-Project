@@ -1,0 +1,39 @@
+\chapter{Indicative Reconstruction Times}
+\label{app:runtime}
+
+Pipeline logs give order-of-magnitude timings under possible GPU sharing. PaDIS-DPS took about two minutes per slice, $24\%$ below whole-image VE-DPS. Fixed patch methods took about $24$ minutes. These are not isolated benchmarks.
+
+\begin{table}[htbp]
+\centering
+\caption[Logged reconstruction time per slice.]{Mean 20-view wall time per slice from non-isolated pipeline logs.}\label{tab:runtime}
+\small
+\begin{tabular}{llr}
+\toprule[1.1pt]
+\multicolumn{1}{l}{\bfseries Implementation} & \multicolumn{1}{l}{\bfseries Reconstruction method} & \multicolumn{1}{r}{\bfseries Mean time per slice} \\
+\midrule
+\textbf{LION-Physical} & Baseline & \textbf{4.71 s} \\
+ & CP & 8.13 s \\
+ & Predictor--corrector & 14.11 s \\
+ & PnP--ADMM & 26.63 s \\
+ & Langevin & 51.49 s \\
+ & VE--DDNM & 62.08 s \\
+ & PaDIS--DPS & 118.85 s \\
+ & VE--DPS (Whole-Image) & 156.44 s \\
+ & Patch stitch & 1,450.73 s (24.18 min) \\
+ & Patch average & 1,468.76 s (24.48 min) \\
+\midrule
+\textbf{Paper-Faithful} & Predictor--corrector & 14.16 s \\
+ & Langevin & 56.42 s \\
+ & VE--DDNM & 61.34 s \\
+ & PaDIS--DPS & 120.45 s \\
+ & VE--DPS (Whole-Image) & 156.89 s \\
+\midrule
+\textbf{Repo-Faithful} & Predictor--corrector & 14.02 s \\
+ & Langevin & 56.55 s \\
+ & VE--DDNM & 58.54 s \\
+ & PaDIS--DPS & 119.22 s \\
+ & Patch stitch & 1,461.08 s (24.35 min) \\
+ & Patch average & 1,468.75 s (24.48 min) \\
+\bottomrule[1.1pt]
+\end{tabular}
+\end{table}

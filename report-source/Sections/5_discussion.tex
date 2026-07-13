@@ -15,7 +15,7 @@ We retained PaDIS training and patch-score construction while moving from AAPM p
 
 Hu et al. reported PaDIS PSNRs of $33.57\,\mathrm{dB}$ at 20 views and $29.48\,\mathrm{dB}$ at 8 views \cite{hu_learning_2024}; our Paper-Faithful track reached $32.71$ and $27.15\,\mathrm{dB}$. Despite changed data and geometry, the 20-view result is within $0.86\,\mathrm{dB}$, while the 8-view result substantially improves over FDK and CP-TV. PaDIS also generated coherent whole CT slices from patches, whereas fixed stitching and averaging produced less credible global anatomy, supporting randomly shifted partitions.
 
-At $512\times512$, PaDIS obtained $40.08\,\mathrm{dB}$ PSNR and $0.960$ SSIM without a whole-image model, reproducing the high-resolution argument \cite{hu_learning_2024}. At 256 resolution, its logged wall time was $24\%$ below whole-image VE-DPS after half the training, although concurrent jobs prevent an isolated benchmark. PaDIS therefore remains useful where whole-image memory or training cost is prohibitive.
+At $512\times512$, PaDIS obtained $40.08\,\mathrm{dB}$ PSNR and $0.960$ SSIM without a whole-image model, reproducing the high-resolution argument \cite{hu_learning_2024}. PaDIS therefore remains useful where whole-image memory is prohibitive.
 
 \subsection{Findings that Did Not Transfer}
 
@@ -52,9 +52,9 @@ The LION-Physical DPS rows reached relative sinogram residuals near $10^{-3}$, o
 
 The Repo-Faithful fan-beam updates required calibrated gradient scales of $0.0405$ and $0.1022$. Replacing these with $\lVert F\rVert_2^2$ normalisation still gave high-quality results across each angular setting. These constants therefore correct for a particular implementation, rather than defining PaDIS itself. Operator normalisation is a more reproducible choice because it remains meaningful when the geometry changes.
 
-\subsection{Cost of Fixed Patch Assembly}
+\subsection{Fixed Patch Assembly}
 
-Fixed averaging obtained the strongest displayed SSIM and MAE in parts of \autoref{tab:main-quality}, but these rows contain only four images and have wide uncertainty. They also required roughly 24 minutes per slice, about twelve times the PaDIS-DPS runtime, and their unconditional generations lacked credible global anatomy. They show that overlap handling can suppress seams, but do not provide a practical improvement over random PaDIS partitions.
+Fixed averaging obtained the strongest displayed SSIM and MAE in parts of \autoref{tab:main-quality}, but these rows contain only four images and have wide uncertainty. Their unconditional generations also lacked credible global anatomy. They show that overlap handling can suppress seams, but do not establish an improvement over random PaDIS partitions.
 
 \section{Limitations and Future Work}
 
