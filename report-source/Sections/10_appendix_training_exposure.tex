@@ -1,0 +1,27 @@
+%!TEX root = ../thesis.tex
+\chapter{Diffusion Training Exposure}
+\label{app:training-exposure}
+
+\begin{table}[htbp]
+\centering
+\caption[Diffusion training exposure.]{Final Weights \& Biases training counters. Whole-image rows count complete images, while PaDIS rows count sampled patches. Model labels link to their runs.}
+\label{tab:training-exposure}
+\small
+\begin{tabular}{lr}
+\toprule[1.1pt]
+\textbf{Model} & \textbf{Samples seen} \\
+\midrule
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/xq69oaui}{Whole image, default data} & 1,239,000 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/9e3903d7}{Whole image, all data} & 1,224,536 \\
+\midrule
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/3r8yjo1x}{PaDIS, default} & 30,576,000 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/vd4zu3h2}{PaDIS, all data} & 30,293,504 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/k3ewkq7y}{PaDIS, $512\times512$} & 19,828,224 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/zgivu4ud}{PaDIS, $P=8$} & 100,539,904 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/uaasmrt6}{PaDIS, $P=16$} & 107,610,624 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/88014kal}{PaDIS, $P=32$} & 78,504,576 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/e24q8o1e}{PaDIS, $P=96$} & 9,906,944 \\
+\href{https://wandb.ai/tjh200-university-of-cambridge/PaDIS-Reproduction/runs/aqh1bipv}{PaDIS, no position channels} & 30,199,808 \\
+\bottomrule[1.1pt]
+\end{tabular}
+\end{table}
