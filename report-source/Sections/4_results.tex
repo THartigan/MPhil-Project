@@ -11,17 +11,17 @@ Metrics follow the conventions in \secref{sec:method}. Diffusion configurations 
 
 \section{Reconstruction Quality}
 
-The main inverse-solver comparison results are presented in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-Physical PaDIS-VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-VE-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-Physical VE-DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the Paper-Faithful and Repo-Faithful VE-DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example. Reconstruction timings appear in \hyperref[app:runtime]{Appendix~\ref*{app:runtime}}.
+The main inverse-solver comparison results are presented in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-Physical PaDIS-VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again gave the highest SSIM and lowest MAE on four images. PaDIS-VE-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-Physical VE-DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the Paper-Faithful and Repo-Faithful VE-DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example. Reconstruction timings appear in \hyperref[app:runtime]{Appendix~\ref*{app:runtime}}.
 
 \begin{center}
 \centering
 \includegraphics[width=\textwidth]{figure5_ct_reconstruction.pdf}
 \captionsetup{type=figure,hypcap=false}
-\caption[Representative 20- and 60-view reconstructions.]{Representative LION-Physical fan-beam reconstructions using FDK, CP, whole-image VE-DPS and PaDIS-VE-DPS. The top two rows use 60 views and HU display. The bottom two use 20 views and NI.}
+\caption[Representative 20- and 60-view reconstructions.]{Representative LION-Physical fan-beam reconstructions using FDK, CP, whole-image VE-DPS, and PaDIS-VE-DPS. The top two rows use 60 views and HU display. The bottom two use 20 views and NI.}
 \label{fig:results-ct-reconstruction}
 \end{center}
 
-We observed the same sampler dependence across geometries (\autoref{tab:extra-quality} and \autoref{fig:results-extra-ct}), with PaDIS-VE-DDNM reconstruction leading the 60-view experiment at $41.55\,\mathrm{dB}$ and $0.951$ SSIM. In the 120-degree limited-angle problem, whole-image VE-DPS gave the best image metrics, whereas PaDIS-VE-DPS gave the smallest residual. At native resolution, LION-Physical PaDIS-VE-DPS reconstruction reached $40.08\,\mathrm{dB}$ and $0.960$ SSIM (\autoref{tab:ct512} and \autoref{fig:results-512-ct}), improving on CP-TV by $6.31\,\mathrm{dB}$.
+We observed the same sampler dependence across geometries (\autoref{tab:extra-quality} and \autoref{fig:results-extra-ct}), with PaDIS-VE-DDNM leading the 60-view experiment at $41.55\,\mathrm{dB}$ and $0.951$ SSIM. In the 120-degree limited-angle problem, whole-image VE-DPS gave the best image metrics, whereas PaDIS-VE-DPS gave the smallest residual. At native resolution, LION-Physical PaDIS-VE-DPS reconstruction reached $40.08\,\mathrm{dB}$ and $0.960$ SSIM (\autoref{tab:ct512} and \autoref{fig:results-512-ct}), improving on CP-TV by $6.31\,\mathrm{dB}$.
 
 \clearpage
 
@@ -53,8 +53,8 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \addlinespace[2pt]\midrule
 \textbf{LION-Physical} & FDK & -- & $23.35^{+0.76}_{-0.70}$ & $0.439^{+0.019}_{-0.018}$ & $0.0483^{+0.0039}_{-0.0041}$ & $0.1008^{+0.0141}_{-0.0144}$ & $19.09^{+0.89}_{-0.77}$ & $0.305^{+0.019}_{-0.020}$ & $0.0796^{+0.0070}_{-0.0071}$ & $0.2288^{+0.0320}_{-0.0338}$ \\
  & CP & TV & $28.62^{+0.53}_{-0.51}$ & $0.738^{+0.019}_{-0.018}$ & $0.0221^{+0.0015}_{-0.0015}$ & $0.0113^{+0.0012}_{-0.0012}$ & $24.38^{+0.74}_{-0.69}$ & $0.582^{+0.023}_{-0.023}$ & $0.0410^{+0.0040}_{-0.0039}$ & $0.0249^{+0.0042}_{-0.0046}$ \\
- & PnP--ADMM & DRUnet (cond) & $26.12^{+1.13}_{-1.22}$ & $0.620^{+0.044}_{-0.050}$ & $0.0314^{+0.0042}_{-0.0038}$ & $0.0093^{+0.0052}_{-0.0043}$ & $17.26^{+1.04}_{-1.23}$ & $0.291^{+0.060}_{-0.058}$ & $0.0889^{+0.0211}_{-0.0178}$ & $0.1236^{+0.0649}_{-0.0507}$ \\
- & PnP--ADMM & DRUnet & $26.12^{+1.14}_{-1.22}$ & $0.620^{+0.043}_{-0.048}$ & $0.0315^{+0.0041}_{-0.0037}$ & $0.0093^{+0.0050}_{-0.0045}$ & $17.93^{+0.95}_{-0.98}$ & $0.320^{+0.054}_{-0.052}$ & $0.0777^{+0.0137}_{-0.0125}$ & $0.0813^{+0.0274}_{-0.0199}$ \\
+ & PnP--ADMM & DRUNet (cond) & $26.12^{+1.13}_{-1.22}$ & $0.620^{+0.044}_{-0.050}$ & $0.0314^{+0.0042}_{-0.0038}$ & $0.0093^{+0.0052}_{-0.0043}$ & $17.26^{+1.04}_{-1.23}$ & $0.291^{+0.060}_{-0.058}$ & $0.0889^{+0.0211}_{-0.0178}$ & $0.1236^{+0.0649}_{-0.0507}$ \\
+ & PnP--ADMM & DRUNet & $26.12^{+1.14}_{-1.22}$ & $0.620^{+0.043}_{-0.048}$ & $0.0315^{+0.0041}_{-0.0037}$ & $0.0093^{+0.0050}_{-0.0045}$ & $17.93^{+0.95}_{-0.98}$ & $0.320^{+0.054}_{-0.052}$ & $0.0777^{+0.0137}_{-0.0125}$ & $0.0813^{+0.0274}_{-0.0199}$ \\
  & VE--DPS & Whole-Image & $34.25^{+0.71}_{-0.66}$ & $0.865^{+0.021}_{-0.025}$ & $0.0118^{+0.0011}_{-0.0011}$ & $0.0014^{+0.0001}_{-0.0001}$ & $\mathbf{29.58^{+0.68}_{-0.60}}$ & $0.783^{+0.023}_{-0.023}$ & $0.0175^{+0.0012}_{-0.0013}$ & $\mathbf{0.0012^{+0.0001}_{-0.0001}}$ \\
  & Langevin & PaDIS & $31.62^{+0.94}_{-0.93}$ & $0.788^{+0.045}_{-0.048}$ & $0.0167^{+0.0030}_{-0.0025}$ & $0.0015^{+0.0001}_{-0.0001}$ & $26.16^{+0.55}_{-0.52}$ & $0.652^{+0.040}_{-0.044}$ & $0.0272^{+0.0024}_{-0.0023}$ & $0.0014^{+0.0002}_{-0.0002}$ \\
  & Langevin & Whole-Image & $33.26^{+0.63}_{-0.63}$ & $0.851^{+0.021}_{-0.021}$ & $0.0128^{+0.0011}_{-0.0011}$ & $0.0017^{+0.0001}_{-0.0001}$ & -- & -- & -- & -- \\
@@ -75,7 +75,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \begin{landscape}
 \begin{table}[p]
 \centering
-\caption[Additional full- and limited-angle results.]{Reconstruction performance of select inverse samplers, priors and implementations in additional full- and limited-angle geometries.}\label{tab:extra-quality}
+\caption[Additional full- and limited-angle results.]{Reconstruction performance of select inverse samplers, priors, and implementations in additional full- and limited-angle geometries.}\label{tab:extra-quality}
 \small
 \setlength{\tabcolsep}{2.4pt}
 \resizebox{\linewidth}{!}{%
@@ -105,7 +105,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figureA10_extra_ct.pdf}
-\caption[Full- and limited-angle reconstructions.]{Additional LION-Physical reconstructions in HU. The top row uses 60 views over $360^\circ$. The bottom uses 20 views over a $120^\circ$ angular range. Columns compare FDK, CP, whole-image VE-DPS, PaDIS-VE-DPS and ground truth.}
+\caption[Full- and limited-angle reconstructions.]{Additional LION-Physical reconstructions in HU. The top row uses 60 views over $360^\circ$. The bottom uses 20 views over a $120^\circ$ angular range. Columns compare FDK, CP, whole-image VE-DPS, PaDIS-VE-DPS, and ground truth.}
 \label{fig:results-extra-ct}
 \end{figure}
 
@@ -179,7 +179,7 @@ Our patch-size analysis in \autoref{tab:patch-size} did not show a simple small-
 
 \subsection{Training-Set Size}
 
-Training on all processed slices slightly improved the whole-image LION-Physical result, but reduced PaDIS-VE-DPS PSNR from $32.82$ to $31.68\,\mathrm{dB}$ (\autoref{tab:dataset-size}). Only subtle qualitative differences are visible in \autoref{fig:results-dataset-size}, showing neither full-data output is visibly superior. Within each prior type, the subset- and full-data models received the same fixed wall-clock budget, meaning full-data models completed fewer passes over each image. These results therefore compare performance at different dataset sizes under fixed within-prior compute, but do not isolate dataset size from training exposure per image.
+Training on all processed slices slightly improved the whole-image LION-Physical result, but reduced PaDIS-VE-DPS PSNR from $32.82$ to $31.68\,\mathrm{dB}$ (\autoref{tab:dataset-size}). Only subtle qualitative differences are visible in \autoref{fig:results-dataset-size}, and neither full-data output is visibly superior. Within each prior type, the subset- and full-data models received the same fixed wall-clock budget, meaning full-data models completed fewer passes over each image. These results therefore compare performance at different dataset sizes under fixed within-prior compute, but do not isolate dataset size from training exposure per image.
 
 \begin{figure}[htbp]
 \centering
@@ -216,7 +216,7 @@ Training on all processed slices slightly improved the whole-image LION-Physical
 }
 \end{table}
 
-\subsection{Position, Initialisation and Schedule}
+\subsection{Position, Initialisation, and Schedule}
 
 Replacing FDK initialisation with Gaussian noise changed LION-Physical PSNR by at most $0.10\,\mathrm{dB}$ across all variants (\autoref{tab:position}), while removing positional channels reduced PSNR by $0.30\,\mathrm{dB}$ from FDK and $0.40\,\mathrm{dB}$ from noise initialisations. The reconstructions in \autoref{fig:results-position-encoding} are nevertheless visually similar. Positional channels therefore gave only a small improvement in these measurement-conditioned reconstructions. In contrast, replacing the geometric schedule with the public repository's EDM-style default reduced the position-enabled LION-Physical result from $32.82$ to $31.53\,\mathrm{dB}$ with FDK initialisation.
 
@@ -229,7 +229,7 @@ Replacing FDK initialisation with Gaussian noise changed LION-Physical PSNR by a
 
 \begin{table}[htbp]
 \centering
-\caption[Position, initialisation and schedule ablations.]{PaDIS-VE-DPS position, initialisation and noise-schedule ablations using 20 views over $360^\circ$.}\label{tab:position}
+\caption[Position, initialisation, and schedule ablations.]{PaDIS-VE-DPS position, initialisation, and noise-schedule ablations using 20 views over $360^\circ$.}\label{tab:position}
 \small
 \normalsize
 \setlength{\tabcolsep}{2pt}
@@ -260,7 +260,7 @@ Replacing FDK initialisation with Gaussian noise changed LION-Physical PSNR by a
 
 \subsection{Sampler Dependence}
 
-Sampler choice changed the ranking of the learned priors. Under their validation-selected LION-Physical settings at 20 views, VE-DDNM favoured PaDIS by $2.30\,\mathrm{dB}$, whilst VE-DPS and Langevin favoured the whole-image prior by $1.43$ and $1.64\,\mathrm{dB}$ respectively (\autoref{tab:main-quality}). Predictor-corrector gave similar PSNR for both priors but substantially higher SSIM for PaDIS. The comparison in \autoref{fig:results-sampling-methods} shows that each method produced plausible low-frequency anatomy on the selected slice. PC reconstructions were, however, notably noisier, and VE-DDNM reconstructions better able to resolve fine-scale structures.
+Sampler choice changed the ranking of the learned priors. Under their validation-selected LION-Physical settings at 20 views, VE-DDNM favoured PaDIS by $2.30\,\mathrm{dB}$, whilst VE-DPS and Langevin favoured the whole-image prior by $1.43$ and $1.64\,\mathrm{dB}$ respectively (\autoref{tab:main-quality}). Predictor-corrector gave similar PSNR for both priors but substantially higher SSIM for PaDIS. The comparison in \autoref{fig:results-sampling-methods} shows that each method produced plausible low-frequency anatomy on the selected slice. PC reconstructions were, however, notably noisier, and VE-DDNM reconstructions were better able to resolve fine-scale structures.
 
 \begin{figure}[htbp]
 \centering
@@ -271,12 +271,12 @@ Sampler choice changed the ranking of the learned priors. Under their validation
 
 \section{Unconditional Generation}
 
-Among the four generation samples per method in \autoref{fig:results-generation}, whole-image samples were the most anatomically correct, PaDIS samples maintained good image continuity, but not anatomical correctness, and both the patch-averaging and patch-stitching methods generated discontiuous, non-anatomical samples.
+Among the four samples generated per method in \autoref{fig:results-generation}, whole-image samples were the most anatomically correct. PaDIS samples maintained good image continuity but not anatomical correctness, while both patch-averaging and patch-stitching generated discontinuous, non-anatomical samples.
 
 % Qualitative result panels.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figure4_generation.pdf}
-\caption[Unconditional generation comparison.]{Unconditional samples from whole-image, fixed patch-stitching, fixed patch-averaging and PaDIS priors, shown in NI. Columns are independent samples.}
+\caption[Unconditional generation comparison.]{Unconditional samples from whole-image, fixed patch-stitching, fixed patch-averaging, and PaDIS priors, shown in NI. Columns are independent samples.}
 \label{fig:results-generation}
 \end{figure}

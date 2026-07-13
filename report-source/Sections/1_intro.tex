@@ -21,7 +21,7 @@ imaging, reducing the number of views or photon flux can lower patient dose, but
 also makes reconstruction more ill-posed and increases the influence of sampling
 artefacts and noise \cite{sidky_accurate_2006, chang_modeling_2017}. Industrial
 systems and research applications can often use more views and higher energies,
-yet acquisition time, motion, restricted access and radiation-sensitive
+yet acquisition time, motion, restricted access, and radiation-sensitive
 specimens create related constraints \cite{sun_realisation_2023}.
 
 Learned image priors can regularise these underdetermined problems. Diffusion models are particularly expressive, but conventional whole-image models require substantial memory and training data. Hu et al. proposed the Patch Diffusion Inverse Solver (PaDIS), which learns position-conditioned patch scores and combines randomly shifted patch partitions during sampling \cite{hu_learning_2024}. Hu et al. report that PaDIS reduces training cost and outperforms an otherwise comparable whole-image diffusion prior on sparse-view CT. These claims matter for high-resolution medical imaging with small datasets, but the original PaDIS paper and its released implementation leave several experimental choices ambiguous or inconsistent.
@@ -30,8 +30,8 @@ The primary objectives are to:
 \begin{itemize}[leftmargin=1.5em,itemsep=0.1em,topsep=0.2em,parsep=0pt]
     \item Reproduce the core PaDIS result on a different public CT dataset using a physically specified fan-beam operator.
     \item Compare the Paper-Faithful and Repo-Faithful reproductions and evaluate the LION-Physical operator-normalised extension introduced here.
-    \item Quantify the effects of patch size, training-set size, positional encoding, initialisation and sampler choice.
+    \item Quantify the effects of patch size, training-set size, positional encoding, initialisation, and sampler choice.
 \end{itemize}
-To address these objectives, we implemented the complete pipeline in LION \cite{kiss_benchmarking_2025,noauthor_cambridgecialion_2026} using patient-separated LIDC-IDRI splits \cite{armato_iii_data_2015-1,armato_lung_2011}. The evaluation includes FDK, TV and plug-and-play baselines, alternative diffusion samplers, fixed patch-assembly methods, PaDIS and whole-image diffusion. Experiments cover 8, 20 and 60 views, limited-angle acquisition, and native $512\times512$ reconstruction. Quantitative results include image-level bootstrap uncertainty and measurement-consistency metrics.
+To address these objectives, we implemented the complete pipeline in LION \cite{kiss_benchmarking_2025,noauthor_cambridgecialion_2026} using patient-separated LIDC-IDRI splits \cite{armato_iii_data_2015-1,armato_lung_2011}. The evaluation includes FDK, TV, and plug-and-play baselines, alternative diffusion samplers, fixed patch-assembly methods, PaDIS, and whole-image diffusion. Experiments cover 8, 20, and 60 views, limited-angle acquisition, and native $512\times512$ reconstruction. Quantitative results include image-level bootstrap uncertainty and measurement-consistency metrics.
 
-This work therefore tests the generalisability of the central claims made by Hu et al. \cite{hu_learning_2024} across different data and geometry rather than seeking numerical identity. The remaining sections present the background, methods, results and discussion before the conclusion.
+This work therefore tests the generalisability of the central claims made by Hu et al. \cite{hu_learning_2024} across different data and geometry rather than seeking numerical identity. The remaining sections present the background, methods, results, and discussion before the conclusion.
