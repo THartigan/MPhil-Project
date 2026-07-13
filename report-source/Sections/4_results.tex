@@ -6,11 +6,11 @@
 
 \chapter{Results}
 \label{sec:results}
-Metrics are reported following the conventions described in \secref{sec:method}. For convenience, we often refer to reconstruction methods as PriorName-SampleName. Figures shorten PaDIS-VE-DPS to simply PaDIS.
+Metrics follow the conventions in \secref{sec:method}. Diffusion configurations are named by prior or score assembly followed by sampler, such as PaDIS-VE-DPS. Tables separate sampler from prior/assembly. Figures use Whole image and PaDIS to abbreviate whole-image VE-DPS and PaDIS-VE-DPS, respectively.
 
 \section{Reconstruction Quality}
 
-The main inverse-solver comparison results are presented in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-Physical PaDIS-VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-Physical DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the Paper-Faithful and Repo-Faithful DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example. Reconstruction timings appear in \hyperref[app:runtime]{Appendix~\ref*{app:runtime}}.
+The main inverse-solver comparison results are presented in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-Physical PaDIS-VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-VE-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-Physical VE-DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the Paper-Faithful and Repo-Faithful VE-DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example. Reconstruction timings appear in \hyperref[app:runtime]{Appendix~\ref*{app:runtime}}.
 
 \begin{center}
 \centering
@@ -27,7 +27,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \begin{landscape}
 \begin{table}[p]
 \centering
-\caption[Main 8- and 20-view results.]{Main 8- and 20-view fan-beam results across inverse samplers, priors and implementations.}\label{tab:main-quality}
+\caption[Main 8- and 20-view results.]{Main 8- and 20-view fan-beam results across reconstruction methods and implementations.}\label{tab:main-quality}
 \small
 \setlength{\tabcolsep}{2.4pt}
 \resizebox{\linewidth}{!}{%
@@ -35,7 +35,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \toprule[1.1pt]
 \multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Reconstruction method} & \multicolumn{4}{c}{\bfseries 20-View 360 Degrees} & \multicolumn{4}{c}{\bfseries 8-View 360 Degrees} \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-7} \cmidrule(lr){8-11}
- & \textbf{Sampler} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+ & \textbf{Solver/sampler} & \textbf{Prior/assembly} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
 \midrule
 \textbf{Paper-Faithful} & VE--DPS & Whole-Image & $33.97^{+0.67}_{-0.62}$ & $0.825^{+0.020}_{-0.022}$ & $0.0137^{+0.0010}_{-0.0010}$ & $0.0373^{+0.0026}_{-0.0027}$ & $29.10^{+0.75}_{-0.76}$ & $0.743^{+0.024}_{-0.024}$ & $0.0195^{+0.0015}_{-0.0014}$ & $0.0330^{+0.0036}_{-0.0037}$ \\
  & Langevin & PaDIS & $30.74^{+0.91}_{-0.94}$ & $0.680^{+0.041}_{-0.045}$ & $0.0221^{+0.0026}_{-0.0025}$ & $0.0800^{+0.0129}_{-0.0123}$ & $26.08^{+0.53}_{-0.50}$ & $0.589^{+0.035}_{-0.038}$ & $0.0295^{+0.0020}_{-0.0020}$ & $0.0542^{+0.0066}_{-0.0064}$ \\
@@ -46,8 +46,8 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \textbf{Repo-Faithful} & Langevin & PaDIS & $31.86^{+0.79}_{-0.77}$ & $0.795^{+0.030}_{-0.037}$ & $0.0165^{+0.0018}_{-0.0018}$ & $0.0353^{+0.0025}_{-0.0025}$ & $23.88^{+0.79}_{-0.73}$ & $0.553^{+0.032}_{-0.032}$ & $0.0402^{+0.0036}_{-0.0036}$ & $0.0341^{+0.0024}_{-0.0024}$ \\
  & PC & PaDIS & $28.15^{+0.34}_{-0.34}$ & $0.627^{+0.029}_{-0.028}$ & $0.0264^{+0.0013}_{-0.0014}$ & $0.0705^{+0.0082}_{-0.0078}$ & $23.86^{+0.61}_{-0.56}$ & $0.462^{+0.021}_{-0.018}$ & $0.0423^{+0.0030}_{-0.0029}$ & $0.0335^{+0.0038}_{-0.0040}$ \\
  & VE--DDNM & PaDIS & $30.00^{+1.07}_{-1.16}$ & $0.712^{+0.052}_{-0.056}$ & $0.0215^{+0.0035}_{-0.0032}$ & $0.0048^{+0.0005}_{-0.0005}$ & $25.85^{+0.64}_{-0.63}$ & $0.602^{+0.043}_{-0.046}$ & $0.0300^{+0.0029}_{-0.0028}$ & $0.0061^{+0.0005}_{-0.0004}$ \\
- & VE--DPS & Patch avg. & $35.77^{+0.32}_{-0.39}$ & $0.882^{+0.023}_{-0.021}$ & $0.0102^{+0.0008}_{-0.0005}$ & $0.0266^{+0.0061}_{-0.0059}$ & $29.05^{+1.73}_{-1.43}$ & $0.778^{+0.044}_{-0.048}$ & $0.0179^{+0.0030}_{-0.0029}$ & $0.0171^{+0.0053}_{-0.0041}$ \\
- & VE--DPS & Patch stitch. & $35.04^{+0.34}_{-0.19}$ & $0.889^{+0.011}_{-0.021}$ & $0.0109^{+0.0003}_{-0.0002}$ & $0.0353^{+0.0092}_{-0.0120}$ & $27.79^{+1.15}_{-1.15}$ & $0.741^{+0.028}_{-0.025}$ & $0.0206^{+0.0023}_{-0.0023}$ & $0.0144^{+0.0021}_{-0.0021}$ \\
+ & VE--DPS & Fixed average & $35.77^{+0.32}_{-0.39}$ & $0.882^{+0.023}_{-0.021}$ & $0.0102^{+0.0008}_{-0.0005}$ & $0.0266^{+0.0061}_{-0.0059}$ & $29.05^{+1.73}_{-1.43}$ & $0.778^{+0.044}_{-0.048}$ & $0.0179^{+0.0030}_{-0.0029}$ & $0.0171^{+0.0053}_{-0.0041}$ \\
+ & VE--DPS & Fixed stitch & $35.04^{+0.34}_{-0.19}$ & $0.889^{+0.011}_{-0.021}$ & $0.0109^{+0.0003}_{-0.0002}$ & $0.0353^{+0.0092}_{-0.0120}$ & $27.79^{+1.15}_{-1.15}$ & $0.741^{+0.028}_{-0.025}$ & $0.0206^{+0.0023}_{-0.0023}$ & $0.0144^{+0.0021}_{-0.0021}$ \\
  & VE--DPS & PaDIS & $32.49^{+1.10}_{-1.12}$ & $0.805^{+0.041}_{-0.045}$ & $0.0156^{+0.0022}_{-0.0022}$ & $0.0187^{+0.0027}_{-0.0024}$ & $25.50^{+0.76}_{-0.84}$ & $0.619^{+0.042}_{-0.042}$ & $0.0307^{+0.0037}_{-0.0033}$ & $0.0135^{+0.0010}_{-0.0010}$ \\
 \addlinespace[2pt]\midrule
 \textbf{LION-Physical} & FDK & -- & $23.35^{+0.76}_{-0.70}$ & $0.439^{+0.019}_{-0.018}$ & $0.0483^{+0.0039}_{-0.0041}$ & $0.1008^{+0.0141}_{-0.0144}$ & $19.09^{+0.89}_{-0.77}$ & $0.305^{+0.019}_{-0.020}$ & $0.0796^{+0.0070}_{-0.0071}$ & $0.2288^{+0.0320}_{-0.0338}$ \\
@@ -61,8 +61,8 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
  & PC & Whole-Image & $28.91^{+0.30}_{-0.31}$ & $0.585^{+0.013}_{-0.014}$ & $0.0242^{+0.0008}_{-0.0008}$ & $0.0208^{+0.0027}_{-0.0025}$ & -- & -- & -- & -- \\
  & VE--DDNM & PaDIS & $\mathbf{36.49^{+0.95}_{-0.94}}$ & $0.895^{+0.021}_{-0.023}$ & $0.0103^{+0.0012}_{-0.0012}$ & $\mathbf{0.0013^{+0.0002}_{-0.0001}}$ & $27.12^{+0.66}_{-0.65}$ & $0.670^{+0.034}_{-0.037}$ & $0.0265^{+0.0020}_{-0.0021}$ & $0.0112^{+0.0018}_{-0.0016}$ \\
  & VE--DDNM & Whole-Image & $34.19^{+1.16}_{-1.09}$ & $0.835^{+0.035}_{-0.036}$ & $0.0136^{+0.0019}_{-0.0018}$ & $0.0025^{+0.0003}_{-0.0003}$ & -- & -- & -- & -- \\
- & VE--DPS & Patch avg. & $36.10^{+1.40}_{-1.52}$ & $\mathbf{0.914^{+0.029}_{-0.051}}$ & $\mathbf{0.0087^{+0.0024}_{-0.0015}}$ & $0.0014^{+0.0003}_{-0.0003}$ & $29.05^{+1.28}_{-1.19}$ & $\mathbf{0.805^{+0.045}_{-0.068}}$ & $\mathbf{0.0167^{+0.0034}_{-0.0025}}$ & $0.0015^{+0.0003}_{-0.0003}$ \\
- & VE--DPS & Patch stitch. & $34.23^{+1.45}_{-1.10}$ & $0.888^{+0.034}_{-0.039}$ & $0.0107^{+0.0017}_{-0.0017}$ & $0.0018^{+0.0004}_{-0.0004}$ & $27.96^{+0.68}_{-0.68}$ & $0.773^{+0.020}_{-0.018}$ & $0.0191^{+0.0009}_{-0.0014}$ & $0.0020^{+0.0004}_{-0.0004}$ \\
+ & VE--DPS & Fixed average & $36.10^{+1.40}_{-1.52}$ & $\mathbf{0.914^{+0.029}_{-0.051}}$ & $\mathbf{0.0087^{+0.0024}_{-0.0015}}$ & $0.0014^{+0.0003}_{-0.0003}$ & $29.05^{+1.28}_{-1.19}$ & $\mathbf{0.805^{+0.045}_{-0.068}}$ & $\mathbf{0.0167^{+0.0034}_{-0.0025}}$ & $0.0015^{+0.0003}_{-0.0003}$ \\
+ & VE--DPS & Fixed stitch & $34.23^{+1.45}_{-1.10}$ & $0.888^{+0.034}_{-0.039}$ & $0.0107^{+0.0017}_{-0.0017}$ & $0.0018^{+0.0004}_{-0.0004}$ & $27.96^{+0.68}_{-0.68}$ & $0.773^{+0.020}_{-0.018}$ & $0.0191^{+0.0009}_{-0.0014}$ & $0.0020^{+0.0004}_{-0.0004}$ \\
  & VE--DPS & PaDIS & $32.82^{+1.06}_{-1.06}$ & $0.816^{+0.042}_{-0.047}$ & $0.0148^{+0.0025}_{-0.0021}$ & $\mathbf{0.0013^{+0.0001}_{-0.0001}}$ & $27.65^{+0.75}_{-0.77}$ & $0.706^{+0.041}_{-0.048}$ & $0.0229^{+0.0027}_{-0.0025}$ & $\mathbf{0.0012^{+0.0002}_{-0.0002}}$ \\
 \bottomrule[1.1pt]
 \end{tabular}
@@ -82,7 +82,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \toprule[1.1pt]
 \multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Reconstruction method} & \multicolumn{4}{c}{\bfseries 60-View 360 Degrees} & \multicolumn{4}{c}{\bfseries 20-View 120 Degrees} \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-7} \cmidrule(lr){8-11}
- & \textbf{Sampler} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+ & \textbf{Solver/sampler} & \textbf{Prior/assembly} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
 \midrule
 \textbf{Paper-Faithful} & VE--DDNM & PaDIS & $36.70^{+1.37}_{-1.42}$ & $0.874^{+0.029}_{-0.032}$ & $0.0116^{+0.0019}_{-0.0018}$ & $0.0030^{+0.0003}_{-0.0003}$ & $26.79^{+0.76}_{-0.78}$ & $0.590^{+0.036}_{-0.035}$ & $0.0298^{+0.0028}_{-0.0027}$ & $0.0117^{+0.0018}_{-0.0016}$ \\
 \addlinespace[2pt]\midrule
@@ -119,7 +119,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \toprule[1.1pt]
 \multicolumn{1}{c}{\bfseries Implementation} & \multicolumn{2}{c}{\bfseries Reconstruction method} & \multicolumn{4}{c}{\bfseries $512\times512$, 60-View 360 Degrees} \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-7}
- & \textbf{Sampler} & \textbf{Prior} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
+ & \textbf{Solver/sampler} & \textbf{Prior/assembly} & \textbf{PSNR} & \textbf{SSIM} & \textbf{MAE} & \textbf{RSR} \\
 \midrule
 \textbf{Repo-Faithful} & VE--DPS & PaDIS & $39.24^{+0.12}_{-0.11}$ & $0.922^{+0.007}_{-0.004}$ & $0.0071^{+0.0003}_{-0.0003}$ & $0.0243^{+0.0041}_{-0.0046}$ \\
 \addlinespace[2pt]\midrule
@@ -183,7 +183,7 @@ Training on all processed slices slightly improved the whole-image LION-Physical
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.92\textwidth]{figureA6_dataset_size.pdf}
-\caption[Dataset-size ablation.]{Effect of training-set size on one 20-view reconstruction, shown in NI. Rows compare PaDIS and whole-image VE-DPS. Columns use the default subset, all processed LIDC-IDRI slices, and ground truth.}
+\caption[Dataset-size ablation.]{Effect of training-set size on one 20-view reconstruction, shown in NI. Rows compare PaDIS and whole-image priors under VE-DPS. Columns use the default subset, all processed LIDC-IDRI slices, and ground truth.}
 \label{fig:results-dataset-size}
 \end{figure}
 

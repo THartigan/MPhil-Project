@@ -264,7 +264,7 @@ G_{i,j,r}^T
 \label{eq:padis_score_estimate}
 \end{equation}
 
-where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. In the original paper, Hu et al. found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions \cite{hu_learning_2024,chung_diffusion_2022,song_generative_2019}. Here, that method is referred to as both VE-DPS and PaDIS.
+where $G_{i,j,r}$ extracts the $r$th patch under the selected partition and $G_{i,j,r}^T$ places the corresponding patch score back into the full image. The boundary artefacts are then instead removed through the iterations, as different random shifts are used at different sampling steps. The flexibility of this prior and its ability to approximate the whole-image score allow it to be used with any standard diffusion sampling and inverse-problem method. In the original paper, Hu et al. found that combining diffusion posterior sampling (DPS) and Langevin dynamics worked best for their CT reconstructions \cite{hu_learning_2024,chung_diffusion_2022,song_generative_2019}. Here, this combination is called PaDIS-VE-DPS, while PaDIS alone denotes the patch score construction.
 
 \section{Reconstruction Methods}
 \label{sec:reconstruction_methods}
@@ -488,7 +488,7 @@ the data-consistency update is
 \label{eq:dps_data_update}
 \end{equation}
 
-which can then be followed by at least one Langevin prior step as in \eqref{eq:Langevin_step}. This is generally referred to as the VE-DPS solver throughout this work, with the prior type also quoted. When the prior is patch-based, each step chooses random patch-image offset indices $(i,j)$ and uses the PaDIS combined patches score from \autoref{eq:padis_score_estimate}, matching the PaDIS solver description of Hu et al. \cite{hu_learning_2024}. This convention is used by all diffusion-based inverse solvers in this work.
+At each noise level, VE-DPS repeats a paired DPS measurement update and Langevin prior update as in \eqref{eq:Langevin_step} for each inner step, normally ten times in the reconstruction experiments. VE-DPS denotes the sampler and may use a whole-image score, the PaDIS estimate from \autoref{eq:padis_score_estimate}, or a fixed patch assembly. Complete configurations are therefore named by prior or assembly followed by sampler, such as PaDIS-VE-DPS and whole-image VE-DPS. For PaDIS, each score evaluation normally draws shift $(i,j)$ and assembles the corresponding patch scores, matching Hu et al. \cite{hu_learning_2024}. The same PaDIS construction can be used with Langevin, predictor--corrector and VE-DDNM, which remain distinct samplers.
 
 Discretising the reverse-time SDE \eqref{eq:reverse_time_sde} gives an alternative prediction step from noise level $\sigma_k$ to $\sigma_{k+1}$,
 

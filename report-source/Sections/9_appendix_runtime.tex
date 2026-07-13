@@ -1,7 +1,7 @@
 \chapter{Indicative Reconstruction Times}
 \label{app:runtime}
 
-Possible GPU sharing makes timings approximate. PaDIS-DPS took about two minutes per slice, $24\%$ below whole-image VE-DPS. Fixed patch methods took about $24$ minutes.
+Possible GPU sharing makes timings approximate. PaDIS-VE-DPS took about two minutes per slice, $24\%$ below whole-image VE-DPS. Fixed patch methods took about $24$ minutes.
 
 \begin{table}[htbp]
 \centering
@@ -13,27 +13,27 @@ Possible GPU sharing makes timings approximate. PaDIS-DPS took about two minutes
 \midrule
 \textbf{LION-Physical} & Baseline & \textbf{4.71 s} \\
  & CP & 8.13 s \\
- & Predictor--corrector & 14.11 s \\
+ & PaDIS predictor--corrector & 14.11 s \\
  & PnP--ADMM & 26.63 s \\
- & Langevin & 51.49 s \\
- & VE--DDNM & 62.08 s \\
- & PaDIS--DPS & 118.85 s \\
- & VE--DPS (Whole-Image) & 156.44 s \\
- & Patch stitch & 1,450.73 s (24.18 min) \\
- & Patch average & 1,468.76 s (24.48 min) \\
+ & PaDIS Langevin & 51.49 s \\
+ & PaDIS--VE--DDNM & 62.08 s \\
+ & PaDIS--VE--DPS & 118.85 s \\
+ & Whole-image VE--DPS & 156.44 s \\
+ & Fixed-stitch VE--DPS & 1,450.73 s (24.18 min) \\
+ & Fixed-average VE--DPS & 1,468.76 s (24.48 min) \\
 \midrule
-\textbf{Paper-Faithful} & Predictor--corrector & 14.16 s \\
- & Langevin & 56.42 s \\
- & VE--DDNM & 61.34 s \\
- & PaDIS--DPS & 120.45 s \\
- & VE--DPS (Whole-Image) & 156.89 s \\
+\textbf{Paper-Faithful} & PaDIS predictor--corrector & 14.16 s \\
+ & PaDIS Langevin & 56.42 s \\
+ & PaDIS--VE--DDNM & 61.34 s \\
+ & PaDIS--VE--DPS & 120.45 s \\
+ & Whole-image VE--DPS & 156.89 s \\
 \midrule
-\textbf{Repo-Faithful} & Predictor--corrector & 14.02 s \\
- & Langevin & 56.55 s \\
- & VE--DDNM & 58.54 s \\
- & PaDIS--DPS & 119.22 s \\
- & Patch stitch & 1,461.08 s (24.35 min) \\
- & Patch average & 1,468.75 s (24.48 min) \\
+\textbf{Repo-Faithful} & PaDIS predictor--corrector & 14.02 s \\
+ & PaDIS Langevin & 56.55 s \\
+ & PaDIS--VE--DDNM & 58.54 s \\
+ & PaDIS--VE--DPS & 119.22 s \\
+ & Fixed-stitch VE--DPS & 1,461.08 s (24.35 min) \\
+ & Fixed-average VE--DPS & 1,468.75 s (24.48 min) \\
 \bottomrule[1.1pt]
 \end{tabular}
 \end{table}
