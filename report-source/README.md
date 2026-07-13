@@ -479,12 +479,13 @@ Exclude:
 2. Compile with shell-escape (for the default script: `./compile-thesis.sh compile thesis`).
 3. The class runs:
 
-    `texcount -inc -sum=1,1,0,0,0,0,0 -nobib -1 thesis.tex`
+    `python3 scripts/wordcount.py thesis.tex`
 
 The counts are computed automatically using:
-* `-sum=1,1,0,0,0,0,0` (text + headers, captions and equations ignored),
+* `-sum=1,1,1,0,0,0,0` (the report's TeXcount weighting policy),
 * `-nobib` (bibliography excluded),
 * includes source includes (`-inc`).
+* narrative author attributions such as `Hu et al.` are removed before counting.
 * to exclude a non-standard section (for example your auto-generation tools appendix), use the helper macro in `thesis.tex`:
 
     `\wordcountexclude{Appendix3/auto-generation-tools}`

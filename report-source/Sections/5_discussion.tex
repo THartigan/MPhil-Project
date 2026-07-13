@@ -1,3 +1,4 @@
+%!TEX root = ../thesis.tex
 \ifpdf
     \graphicspath{{Sections/5_discussion_figs/Raster/}{Sections/5_discussion_figs/PDF/}{Sections/5_discussion_figs/}}
 \else
@@ -9,27 +10,25 @@
 
 \section{Comparison with Hu et al.}
 
-We retained Hu et al.'s PaDIS training and patch-score construction \cite{hu_learning_2024} while moving from AAPM parallel-beam to LIDC-IDRI fan-beam data, testing transfer across datasets and operators.
+We retained the training and patch-score construction methods of Hu et al. \cite{hu_learning_2024} while moving from AAPM parallel-beam to LIDC-IDRI fan-beam data, allowing us to test the transfer of these methods across datasets and operators.
 
 \subsection{Findings that Transferred}
 
-Hu et al. reported PaDIS-VE-DPS PSNRs of $33.57\,\mathrm{dB}$ at 20 views and $29.48\,\mathrm{dB}$ at 8 views \cite{hu_learning_2024}. Our Paper-Faithful track reached $32.71$ and $27.15\,\mathrm{dB}$. Despite changed data and geometry, the 20-view result is within $0.86\,\mathrm{dB}$, and the 8-view result substantially improves on FDK and CP-TV. PaDIS also generated coherent whole CT slices from patches, whereas fixed stitching and averaging produced less credible global anatomy, supporting randomly shifted partitions.
+Hu et al. reported PaDIS-VE-DPS PSNRs of $33.57\,\mathrm{dB}$ at 20 views and $29.48\,\mathrm{dB}$ at 8 views \cite{hu_learning_2024}. Our Paper-Faithful track reached $32.71$ and $27.15\,\mathrm{dB}$. Despite changed data and geometry, the 20-view result is within $0.86\,\mathrm{dB}$, and the 8-view result substantially improves on FDK and CP-TV. PaDIS also generated coherent whole CT slices from patches, whereas fixed stitching and averaging produced less credible anatomies, supporting use of randomly shifted patches.
 
-At $512\times512$, LION-Physical PaDIS-VE-DPS obtained $40.08\,\mathrm{dB}$ PSNR and $0.960$ SSIM without a whole-image model, supporting the high-resolution motivation \cite{hu_learning_2024}. PaDIS remains useful where whole-image memory is prohibitive.
+At $512\times512$, LION-Physical PaDIS-VE-DPS obtained $40.08\,\mathrm{dB}$ PSNR and $0.960$ SSIM, significantly outperforming CP-TV and FDK, and supporting the high-resolution motivation \cite{hu_learning_2024}. PaDIS therefore remains useful where whole-image memory is prohibitive.
 
 \subsection{Findings that Did Not Transfer}
 
 We did not reproduce the claim that PaDIS consistently outperforms whole-image diffusion \cite{hu_learning_2024}. In the Paper-Faithful track, whole-image VE-DPS exceeded PaDIS-VE-DPS by $1.26\,\mathrm{dB}$ at 20 views and $1.95\,\mathrm{dB}$ at 8 views. The LION-Physical comparison showed the same reversal, also visible in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional}.
 
-The whole-image prior was not uniformly stronger. Validation-selected LION-Physical PaDIS-VE-DDNM achieved the best 20- and 60-view PSNRs and exceeded its whole-image counterpart by $2.30\,\mathrm{dB}$ at 20 views. Langevin and VE-DPS favoured the whole-image prior, while predictor-corrector rankings depended on the metric. These comparisons do not isolate architecture because settings were validation-selected per prior and sampler, but show that PaDIS performance depends on how its patch score is used.
+The whole-image prior was not, however, uniformly stronger. Validation-selected LION-Physical PaDIS-VE-DDNM achieved the best 20- and 60-view PSNRs and exceeded its whole-image counterpart by $2.30\,\mathrm{dB}$ at 20 views. Langevin and VE-DPS favoured the whole-image prior, while predictor-corrector rankings depended on the metric. These comparisons do not isolate architecture because settings were validation-selected per prior and sampler, but show that PaDIS performance depends on how its patch score is used.
 
 \subsection{Ablation Findings}
 
 We repeated Hu et al.'s patch-size, training-set-size and positional-encoding ablations \cite{hu_learning_2024} on LIDC-IDRI. The initialisation and schedule comparisons instead address paper--code differences.
 
-Smaller patches gave no consistent benefit. The $96\times96$ model nearly matched whole-image VE-DPS, while the default $56\times56$ model was $1.43\,\mathrm{dB}$ lower. Non-monotonic improvement at $8\times8$ suggests that receptive field, optimisation, patch count and partition geometry all contribute. \autoref{tab:patch-size} and \autoref{fig:results-patch-size} favour global context when memory permits, although non-default models inherited the $P=56$ inference setting and may not be optimal. PaDIS's clearest advantage is feasibility rather than quality from very small patches.
-
-Using all processed LIDC-IDRI slices did not improve PaDIS-VE-DPS under fixed within-prior training time, but the full-data model completed fewer passes per image. Equal-epoch results may differ.
+Smaller patches gave no consistent benefit. The $96\times96$ model nearly matched whole-image VE-DPS, while the default $56\times56$ model was $1.43\,\mathrm{dB}$ lower. Non-monotonic improvement at $8\times8$ suggests that receptive field, optimisation, patch count and partition geometry all contribute. \autoref{tab:patch-size} and \autoref{fig:results-patch-size} favour global context when memory permits, although non-default models inherited the $P=56$ inference setting and may not be optimal. PaDIS's clearest advantage is therefore feasibility rather than quality from very small patches. Using all processed LIDC-IDRI slices was also not seen to improve PaDIS-VE-DPS under fixed within-prior training time.
 
 Removing position channels reduced PSNR by only $0.3$ to $0.4\,\mathrm{dB}$, in contrast to the failure reported by Hu et al. \cite{hu_learning_2024}. The CT measurements and repeated data-consistency updates appear to provide enough global information to locate local anatomy. This finding remains conditional on the shared inference setting and does not establish that positional channels are unnecessary for unconditional generation, where no measurements provide spatial context. Similarly, FDK and Gaussian initialisation converged to almost identical results after 1000 model evaluations. The geometric noise schedule had a larger effect, improving PSNR by about $1.3\,\mathrm{dB}$ relative to the public EDM-style default.
 

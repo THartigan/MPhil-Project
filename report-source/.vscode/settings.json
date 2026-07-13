@@ -3,21 +3,22 @@
   "latex-workshop.latex.recipe.default": "first",
   "latex-workshop.latex.recipes": [
     {
-      "name": "compile-thesis.sh",
+      "name": "Build thesis with automatic word count",
       "tools": [
-        "compile-thesis.sh"
+        "Build thesis with automatic word count"
       ]
     }
   ],
   "latex-workshop.latex.tools": [
     {
-      "name": "compile-thesis.sh",
+      "name": "Build thesis with automatic word count",
       "command": "sh",
       "args": [
         "./compile-thesis.sh",
         "compile",
         "thesis"
       ],
+      "cwd": "%DIR%",
       "env": {}
     }
   ]
