@@ -37,4 +37,5 @@ thesis.run.xml*
 *run.xml*
 *.latexmkrc*
 *_latexmk*
+executive_summary.phd-wordcount
 tmp/*

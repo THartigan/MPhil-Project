@@ -69,6 +69,23 @@ if [ $1 = $clean ]; then
 	echo "Cleaning complete!"
 	exit
 elif [ $1 = $compile ]; then
+	if [ "$filename" = "executive_summary" ]; then
+		echo "Updating executive summary word count..."
+		wordcount_tmp="${filename}.phd-wordcount.tmp"
+		if ! python3 scripts/wordcount.py "$filename.tex" > "$wordcount_tmp"; then
+			rm -f "$wordcount_tmp"
+			echo "Word count failed."
+			exit 1
+		fi
+		mv "$wordcount_tmp" "${filename}.phd-wordcount"
+		echo "Compiling executive summary...please wait...!"
+		pdflatex -shell-escape -interaction=nonstopmode "$filename.tex"
+		biber "$filename"
+		pdflatex -shell-escape -interaction=nonstopmode "$filename.tex"
+		pdflatex -shell-escape -interaction=nonstopmode "$filename.tex"
+		echo "Success!"
+		exit
+	fi
 	echo "Compiling your PhD Thesis...please wait...!"
 	pdflatex -shell-escape -interaction=nonstopmode $filename.tex
 	bibtex $filename.aux 	
