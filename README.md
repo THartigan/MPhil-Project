@@ -2,7 +2,7 @@
 
 This repository combines the different git repositories either created or modified as part of this project. 
 They have all been merged here with their commit histories maintained so my contributions can be easily traced.
-The report and executive summary can be found in the [`report`](report-source/output/pdf) directory.
+The report and executive summary can be found in the [`report`](report) directory.
 
 ## Repository Structure
 

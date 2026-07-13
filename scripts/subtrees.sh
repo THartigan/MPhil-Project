@@ -92,6 +92,22 @@ run_for_component() {
             git subtree pull --prefix="$prefix" "$repository" "$branch"
             ;;
         push)
+            git fetch "$repository" "$branch"
+            remote_tip="$(git rev-parse FETCH_HEAD)"
+            remote_tree="$(git rev-parse "${remote_tip}^{tree}")"
+            local_tree="$(git rev-parse "HEAD:${prefix}")"
+
+            # A subtree pull can produce a split merge commit whose tree is
+            # identical to the remote tip without preserving that tip as an
+            # ancestor. Git then rejects an otherwise empty push as a
+            # non-fast-forward. Compare content first so this history-only
+            # divergence is correctly treated as already synchronized.
+            if [[ "$local_tree" == "$remote_tree" ]]; then
+                printf '%s is already up to date with %s/%s.\n' \
+                    "$prefix" "$repository_url" "$branch"
+                return
+            fi
+
             git subtree push --prefix="$prefix" "$repository" "$branch"
             ;;
     esac
