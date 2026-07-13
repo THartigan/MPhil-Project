@@ -6,30 +6,28 @@
 
 \chapter{Results}
 \label{sec:results}
-
-\section*{Reporting Conventions}
-Quantitative tables show $\mathrm{mean}^{+u}_{-l}$ with asymmetric 95\% bootstrap confidence intervals from 2000 resamples. Bold marks the best displayed value, including ties. RSR denotes relative sinogram residual, PC predictor--corrector, CP Chambolle--Pock and NI normalised intensity. Paper-Faithful, Repo-Faithful and LION-Physical identify implementations. Test size is $n=25$, except fixed patch-averaging, patch-stitching and native-resolution rows, which use $n=4$. Runtime values are means without confidence intervals.
+Metrics are reported following the conventions described in \autoref{sec:method}. For convenience, we often refer to reconstruction methods as PriorName-SampleName. Figures shorten PaDIS-VE-DPS to simply PaDIS.
 
 \section{Reconstruction Quality}
 
-We present the main results in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-Physical PaDIS VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-Physical DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the Paper-Faithful and Repo-Faithful DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example.
+The main inverse-solver comparison results are presented in \autoref{tab:main-quality}. At 20 views, the validation-selected LION-Physical PaDIS-VE-DDNM configuration achieved the highest PSNR ($36.49\,\mathrm{dB}$), while fixed patch averaging achieved the highest SSIM and lowest MAE on its smaller four-image subset. At 8 views, whole-image VE-DPS produced the highest PSNR ($29.58\,\mathrm{dB}$), while patch averaging again led SSIM and MAE on four images. PaDIS-DPS improved substantially over FDK and CP-TV in both settings, but did not exceed whole-image diffusion within the VE-DPS comparison, for which each prior used its own validation-selected settings. Operator-normalised LION-Physical DPS reduced the relative sinogram residual to approximately $10^{-3}$, over an order of magnitude below the Paper-Faithful and Repo-Faithful DPS rows. The representative rows in \autoref{fig:results-ct-reconstruction} and the extended 20- and 8-view panels in \autoref{fig:results-ct20-additional} and \autoref{fig:results-ct8-additional} show that these trends persist across varied slices rather than one favourable example.
 
 \begin{center}
 \centering
 \includegraphics[width=\textwidth]{figure5_ct_reconstruction.pdf}
 \captionsetup{type=figure,hypcap=false}
-\caption[Representative 20- and 60-view reconstructions.]{Representative LION-Physical fan-beam reconstructions using FDK, CP, whole-image VE-DPS and PaDIS-DPS. The top two rows use 60 views and an HU display. The bottom two use 20 views and NI.}
+\caption[Representative 20- and 60-view reconstructions.]{Representative LION-Physical fan-beam reconstructions using FDK, CP, whole-image VE-DPS and PaDIS-VE-DPS. The top two rows use 60 views and HU display. The bottom two use 20 views and NI.}
 \label{fig:results-ct-reconstruction}
 \end{center}
 
-We observed the same sampler dependence across geometries (\autoref{tab:extra-quality} and \autoref{fig:results-extra-ct}). PaDIS with VE-DDNM led the 60-view experiment at $41.55\,\mathrm{dB}$ and $0.951$ SSIM. In the 120-degree limited-angle problem, whole-image VE-DPS gave the best image metrics, whereas PaDIS-DPS gave the smallest residual. At native resolution, LION-Physical PaDIS reached $40.08\,\mathrm{dB}$ and $0.960$ SSIM (\autoref{tab:ct512} and \autoref{fig:results-512-ct}), improving on CP-TV by $6.31\,\mathrm{dB}$.
+We observed the same sampler dependence across geometries (\autoref{tab:extra-quality} and \autoref{fig:results-extra-ct}), with PaDIS-VE-DDNM reconstruction leading the 60-view experiment at $41.55\,\mathrm{dB}$ and $0.951$ SSIM. In the 120-degree limited-angle problem, whole-image VE-DPS gave the best image metrics, whereas PaDIS-VE-DPS gave the smallest residual. At native resolution, LION-Physical PaDIS-VE-DPS reconstruction reached $40.08\,\mathrm{dB}$ and $0.960$ SSIM (\autoref{tab:ct512} and \autoref{fig:results-512-ct}), improving on CP-TV by $6.31\,\mathrm{dB}$.
 
 \clearpage
 
 \begin{landscape}
 \begin{table}[p]
 \centering
-\caption[Main 8- and 20-view results.]{Main 8- and 20-view fan-beam results.}\label{tab:main-quality}
+\caption[Main 8- and 20-view results.]{Main 8- and 20-view fan-beam results across inverse samplers, priors and implementations.}\label{tab:main-quality}
 \small
 \setlength{\tabcolsep}{2.4pt}
 \resizebox{\linewidth}{!}{%
@@ -76,7 +74,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \begin{landscape}
 \begin{table}[p]
 \centering
-\caption[Additional full- and limited-angle results.]{Reconstruction in additional full- and limited-angle geometries.}\label{tab:extra-quality}
+\caption[Additional full- and limited-angle results.]{Reconstruction performance of select inverse samplers, priors and implementations in additional full- and limited-angle geometries.}\label{tab:extra-quality}
 \small
 \setlength{\tabcolsep}{2.4pt}
 \resizebox{\linewidth}{!}{%
@@ -106,7 +104,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figureA10_extra_ct.pdf}
-\caption[Full- and limited-angle reconstructions.]{Additional LION-Physical fan-beam reconstructions in HU. The top row uses 60 views over $360^\circ$. The bottom uses 20 views over a limited $120^\circ$ arc. Columns compare FDK, CP, whole-image VE-DPS, PaDIS-DPS and ground truth.}
+\caption[Full- and limited-angle reconstructions.]{Additional LION-Physical reconstructions in HU. The top row uses 60 views over $360^\circ$. The bottom uses 20 views over a $120^\circ$ angular range. Columns compare FDK, CP, whole-image VE-DPS, PaDIS-VE-DPS and ground truth.}
 \label{fig:results-extra-ct}
 \end{figure}
 
@@ -136,7 +134,7 @@ We observed the same sampler dependence across geometries (\autoref{tab:extra-qu
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figure8_512_ct.pdf}
-\caption[Native-resolution reconstruction.]{Native $512\times512$ reconstruction from 60 fan-beam views, displayed in HU. In this example, PaDIS restores more anatomical detail than FDK or CP.}
+\caption[Native-resolution reconstruction.]{Native $512\times512$ reconstruction from 60 fan-beam views, displayed in HU.}
 \label{fig:results-512-ct}
 \end{figure}
 
@@ -148,7 +146,7 @@ Our patch-size analysis in \autoref{tab:patch-size} did not show a simple small-
 
 \begin{table}[htbp]
 \centering
-\caption[Patch-size ablation.]{VE-DPS patch-size ablation using 20 views over $360^\circ$. Unmarked rows use PaDIS.}\label{tab:patch-size}
+\caption[Patch-size ablation.]{VE-DPS patch-size ablation using 20 views over $360^\circ$.}\label{tab:patch-size}
 \small
 \normalsize
 \setlength{\tabcolsep}{2pt}
@@ -180,7 +178,7 @@ Our patch-size analysis in \autoref{tab:patch-size} did not show a simple small-
 
 \subsection{Training-Set Size}
 
-Training on all processed slices slightly improved the whole-image LION-Physical result but reduced PaDIS PSNR from $32.82$ to $31.68\,\mathrm{dB}$ (\autoref{tab:dataset-size}). The qualitative difference is subtle in \autoref{fig:results-dataset-size}. Neither full-data output is visibly superior. Because every model received a fixed wall-clock budget, the full-data models completed fewer passes over each image. This is therefore an equal-compute comparison, not evidence that additional data are intrinsically harmful to PaDIS.
+Training on all processed slices slightly improved the whole-image LION-Physical result, but reduced PaDIS-VE-DPS PSNR from $32.82$ to $31.68\,\mathrm{dB}$ (\autoref{tab:dataset-size}). Only subtle qualitative differences are visible in \autoref{fig:results-dataset-size}, showing neither full-data output is visibly superior. Because every model received a fixed wall-clock budget, the full-data models completed fewer passes over each image. This is therefore an equal-compute comparison, not evidence that additional data is intrinsically harmful to PaDIS. ?!??!?!?! IS THIS TRUE?
 
 \begin{figure}[htbp]
 \centering
