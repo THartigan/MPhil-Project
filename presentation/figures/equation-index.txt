@@ -1,0 +1,27 @@
+01 Beer--Lambert attenuation
+02 Discrete CT forward model
+03 Forward SDE
+04 Reverse-time SDE
+05 VE noising
+06 Denoiser-to-score identity
+07 VE clean estimate and predicted sinogram
+08 Position-aware patch score
+09 Stochastic PaDIS whole-image score estimate
+10 VE-DPS clean estimate
+11 VE-DPS data update
+12 Langevin prior update
+13 Regularised reconstruction objective
+14 Chambolle--Pock primal--dual form
+15 PnP--ADMM data update
+16 PnP--ADMM denoising and correction updates
+17 VE-DDNM measurement-consistency correction
+18 Paper-Faithful VE-DPS update
+19 Repo-Faithful VE-DPS update
+20 LION-Physical VE-DPS update
+21 Composed-operator Lipschitz scale
+22 MAE
+23 PSNR
+24 SSIM
+25 Relative sinogram residual
+26 Repo-Faithful calibrated residual scales
+27 VE-SDE diffusion and drift coefficients
